@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plagchecker</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <!--Import materialize.css-->
+  <link type="text/css" rel="stylesheet" href="css/materialize.css" media="screen,projection" />
+  <link type="text/css" rel="stylesheet" href="css/mine.css" media="screen,projection" />
+
+  <!--Let browser know website is optimized for mobile-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+
+<body>
+  <nav>
+    <div class="nav-wrapper blue">
+      <a href="/" class="brand-logo center">Code Plagiarism checker</a>
+      <ul id="nav-mobile" class="left hide-on-med-and-down">
+        <!-- <li><a href="sass.html">Help</a></li> -->
+      </ul>
+    </div>
+  </nav>
+  <div class="container">
+    <!-- Page Content goes here -->
+    <br>
+    <br>
+    <div class="card-panel">
+      <form method="POST" enctype="multipart/form-data" onsubmit="showModal()">
+        <h5>Add multiple sorce code files to analyse</h5>
+        <div class="input-field col s6">
+          <label for="file" class="blue btn-floating pulse btn-large"><i class="material-icons">add</i></label>
+          <input type="file" class="file" name="file" id="file" multiple />
+          <br />
+          <br>
+          <br />
+          <br />
+          <ul class="collection" id="fileList">
+            <li class="collection-item" id="no-file">No files selected</li>
+          </ul>
+          <button class="btn btn-primary teal btn-large" disabled id="upload">
+            submit
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- modal -->
+  <div id="modal1" class="modal center">
+    <div class="modal-content">
+      <p>Uploading files to server, please wait...</p>
+      <div class="preloader-wrapper active" id="loader">
+        <div class="spinner-layer spinner-blue-only">
+          <div class="circle-clipper left">
+            <div class="circle"></div>
+          </div>
+          <div class="gap-patch">
+            <div class="circle"></div>
+          </div>
+          <div class="circle-clipper right">
+            <div class="circle"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--JavaScript at end of body for optimized loading-->
+  <script type="text/javascript" src="js/materialize.js"></script>
+  <script type="text/javascript" src="js/mine.js"></script>
+</body>
+
+</html>

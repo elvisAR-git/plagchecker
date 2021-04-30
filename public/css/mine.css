@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK&display=swap');
+
+* {
+    font-family: 'Noto Sans HK', sans-serif;
+}
+
+code {
+    font-family: monospace !important;
+}
+
+.file {
+    opacity: 0;
+    width: 0.1px;
+    height: 0.1px;
+    position: absolute;
+}
+
+label {
+    cursor: pointer !important;
+}
