@@ -24,5 +24,6 @@ requirements::
 node.js version 16.0.0
 
 No database setup required!
-run:: "npm install"
-then:: "npm start"
+
+1.  "npm install"
+2.  "npm start"
