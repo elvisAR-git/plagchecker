@@ -1,0 +1,28 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var insurance_order_infoSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true},
+    user_id:{type: Schema.Types.ObjectId, ref: 'User', autopopulate:true},
+    package_id:{type: Schema.Types.ObjectId, ref: 'saas_product_package', autopopulate:true},
+    order_id:{type: Schema.Types.ObjectId, ref: 'order', autopopulate:true},
+    selectedApplicantData: {type: [JSON], default: []},
+    type: {type: String, default: ''},
+    amount: {type: String, default: '0'},
+    is_deleted: { type: Boolean, default: false }
+}, schemaOptions);
+
+insurance_order_infoSchema.plugin(autopopulate);
+
+insurance_order_infoSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('insurance_order_info', insurance_order_infoSchema);

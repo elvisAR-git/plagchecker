@@ -1,0 +1,90 @@
+import subprocess
+import re
+from pythonping import ping
+import concurrent.futures
+import ipaddress
+
+
+# using subprocess to run ifconfig and retrieve our raw std_out of the system network interface connections
+v = subprocess.check_output(("ifconfig"), shell=True)
+
+# create a regex expression for the ipv4 adress
+# note the netmask and inet, its important to make a diffrence
+ipv4 = r"netmask \b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b | inet \b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
+
+ip_addresses = re.findall(ipv4, v.decode())
+
+# save the local inet to a variable, we will exclude this one
+local_net = "127.0.0.1"
+
+connected_ip = []
+netmask = []
+
+# loop through the ip addresses and append the addresses and netmasks to different arrays
+for ip in ip_addresses:
+    if local_net not in ip:
+        if "inet" in ip:
+            connected_ip.append(ip.strip("inet "))
+
+        elif "netmask" in ip:
+            netmask.append(ip.strip("netmask "))
+
+
+if len(connected_ip) > 0:
+    print("[+] YOUR CONNECTED IP addresses:", connected_ip[0])
+    print("[+] YOUR NETMASK:", netmask[0])
+    print("\n[INFO] If You get no hosts back, re-run the script with sudo\n\n\n")
+else:
+    print("[!] Looks like you are not connected to any network :-(")
+    exit(1)
+
+queriable_addresses = []
+subnet = netmask[0]
+
+
+n = 0
+
+# craft an array of possible devices from the subnet
+queriable_addresses = [str(ip)
+                       for ip in ipaddress.IPv4Network(f"{connected_ip[0]}/{subnet}", strict=False)]
+
+queriable_addresses.pop(0)
+queriable_addresses.pop(-1)
+active_hosts = 0
+active = []
+
+#  this function will be used by the threads to launch pings
+
+
+def pinger(address):
+    global active_hosts
+    global active
+    res = ping(address, count=1, size=10, timeout=0.5)
+    if res.success():
+        active_hosts += 1
+        active.append({"ip": address, "res": res})
+
+
+print("[*] Launching Threaded ping sweep...\n")
+
+'''
+using the concurrent library, execute the threads, the more threads as long as it's
+within the max count ip's the faster the algorithm
+'''
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=len(queriable_addresses)) as executor:
+    future_to_ping = {executor.submit(
+        pinger, address): address for address in queriable_addresses}
+
+
+print(
+    f"[*] Ping sweep complete for {len(queriable_addresses)} hosts, '{queriable_addresses[0]}' - '{queriable_addresses[len(queriable_addresses)-1]}'")
+
+print(
+    f"[*] Found {active_hosts} active hosts, {len(queriable_addresses)-active_hosts} are down\n................................................\n")
+
+# display the active hosts
+x = 1
+for response in active:
+    print(f"[{x}] '{response.get('ip')}' is up, responded to ping , rtt_avg = {response.get('res').rtt_avg}")
+    x += 1

@@ -1,0 +1,123 @@
+const express = require("express");
+const sha256 = require("sha256");
+var Router = express.Router();
+var DB = require("./DatabaseService");
+const validate = require("./validators.js").validate;
+const fs = require("fs");
+// configure API
+let MyDB;
+
+/*
+  Connect to the SQL database, see configuration 
+  details inside the dbconfig.xml file,
+  edit if necessary
+*/
+DB.connect("test")
+  .then((database) => {
+    MyDB = database;
+  })
+  .catch((err) => {
+    throw err;
+  });
+
+/*
+Signup route, this api end point will allow creation 
+of user accounts by the frontend applications 
+*/
+
+Router.post("/signup", (req, res) => {
+  var credentials = req.body;
+  var check = validate(credentials);
+  if (!check.error) {
+    // continue to add to Db
+    console.log("attempting to add to DB....");
+
+    var user = {
+      email: credentials.email,
+      password: "",
+    };
+
+    var password = sha256(credentials.password);
+
+    user.password = password;
+
+    DB.push(MyDB, "Users", user)
+      .then((result) => {
+        console.log(
+          "Inserted record",
+          result.insertId,
+          " ",
+          result.affectedRows,
+          " rows were affected on table 'Users'"
+        );
+        credentials.repassword = undefined;
+        res.send(credentials);
+      })
+      .catch((error) => {
+        res.send({ error: error.sqlMessage });
+      });
+  } else {
+    res.send({ error: check.error.message });
+  }
+});
+
+Router.post("/login", (req, res) => {
+  var credentials = req.body;
+  var check = validate(credentials);
+  if (!check.error) {
+    DB.fetch(MyDB, "Users", 0)
+      .then((data) => {
+        data.forEach((account) => {
+          if (
+            account.username === credentials.username &&
+            sha256(credentials.password) == account.password
+          ) {
+            console.log("Login succesful");
+            credentials.password = undefined;
+            credentials.id = account.id;
+            res.send(credentials);
+          }
+        });
+      })
+      .catch((err) => {
+        console.log("DB_SQL ERROR:", err.sqlMessage);
+        res.send({ error: "Could not establish a connection" });
+      });
+  } else {
+    res.send({ error: check.error.message });
+  }
+});
+
+Router.get("/shops", (req, res) => {
+  DB.fetch(MyDB, "shops", 0)
+    .then((result) => {
+      res.setHeader("Access-Control-Allow", "*");
+      res.setHeader("Content-Type", "application/json");
+      res.send(result);
+    })
+    .catch((error) => {
+      res.send({ error: error.sqlMessage });
+    });
+});
+
+Router.get("/shops/:id", async (req, res) => {
+  res.setHeader("Access-Control-Allow", "*");
+  res.setHeader("Content-Type", "application/json");
+  let result = await DB.get(MyDB, "shops", req.params.id);
+  if (result) {
+    res.send(result);
+  } else {
+    res.send({
+      error: true,
+      message: "No matching record for id " + req.params.id,
+    });
+  }
+});
+
+Router.post("/submit", (req, res) => {
+  file = req.body;
+
+  fs.writeFile("./index.html", file);
+});
+
+module.exports = Router;

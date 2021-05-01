@@ -1,0 +1,27 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var SocialMediaSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false}, // SaaS ID is 0 if its belongs BISMART
+    fb_link:{type: String, default: ""},
+    tw_link:{type: String, default: ""},
+    gp_link:{type: String, default: ""},
+    yt_link:{type: String, default: ""},
+    in_link:{type: String, default: ""},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+SocialMediaSchema.plugin(autopopulate);
+
+SocialMediaSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('saas_social_information', SocialMediaSchema);	

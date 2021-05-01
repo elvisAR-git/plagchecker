@@ -1,0 +1,24 @@
+@echo off
+title Argument saver
+
+rem allow user to input the file name
+set /p fileName=Enter file name to save: 
+
+rem check if the file exists
+if exist %fileName% (
+    rem file exist, raise error and pause
+    echo "file name already exists"
+    pause
+    exit
+) else (
+    rem file doesn't exist, now proceed to save arguments
+    rem Create an empty file
+    copy NUL %fileName%
+    
+    rem loop though command line arguments appending them to the file
+    for %%arg in (%*) do (
+        echo %%arg >> "%fileName%"
+    )
+)
+
+pause

@@ -1,0 +1,5 @@
+host: "cse-larry.cse.umn.edu",
+user: "C4131F20U24", // replace with the database user provided to you
+password: "606", // replace with the database password provided to you
+database: "C4131F20U24", // replace with the database user provided to you
+port: 3306

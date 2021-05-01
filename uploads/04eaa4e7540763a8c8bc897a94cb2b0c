@@ -1,0 +1,17 @@
+
+marks = 67
+
+'''
+80+ = A
+60-79 =B
+49-59=C
+'''
+
+if marks < 49:
+    print("you have an E")
+elif marks >= 49 and marks <= 59:
+    print("you have a C")
+elif marks > 59 and marks < 80:
+    print("you have a B")
+else:
+    print("you have an A")

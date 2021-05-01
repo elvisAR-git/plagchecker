@@ -1,0 +1,38 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var ProductCategorySchema = new Schema({
+    name:  {type:String, default: ""},
+    slug:  {type:String, default: ""},
+    icon: {type:String, default: ""}, 
+    type:{
+        type: String,
+        enum: ['General','Life'],
+        default: 'General'
+    },
+    isSaving:{type:Boolean, default: false},
+    isInsurance:{type:Boolean, default: false},
+    PaymentType:{
+        type: String,
+        enum: ['ONETIME','RECURRING'],
+        default: 'ONETIME'
+    },
+    featured_image: {type:String},
+	status: {type:Boolean, default: false},
+    is_deleted: {type: Boolean, default: false },
+}, schemaOptions);
+
+ProductCategorySchema.plugin(autopopulate);
+
+ProductCategorySchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('ProductCategory', ProductCategorySchema);	

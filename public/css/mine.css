@@ -18,3 +18,8 @@ code {
 label {
     cursor: pointer !important;
 }
+
+.scrollable {
+    overflow-y: scroll;
+    height: 500px;
+}

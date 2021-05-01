@@ -1,0 +1,42 @@
+
+#define trigger 8
+#define echo 10
+#define LED 7
+
+
+float time = 0, distance = 0;
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  pinMode(LED, OUTPUT);
+  pinMode(trigger,OUTPUT);
+  pinMode(echo,INPUT);
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  
+  digitalWrite(trigger,LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigger,HIGH);
+  
+  delayMicroseconds(10);
+  digitalWrite(trigger,LOW);
+  
+  delayMicroseconds(2);
+  time=pulseIn(echo,HIGH);
+   n                               m,
+  distance=time*340/20000;
+  Serial.print(distance);
+  Serial.print("\n");
+  if(distance <= 6.0){
+    digitalWrite(LED, HIGH);
+    
+  }else{
+    digitalWrite(LED, LOW);
+    
+  }
+    
+}

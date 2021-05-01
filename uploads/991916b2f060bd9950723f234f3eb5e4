@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1>Cheat code</h1>
+    <hr />
+    <code>
+      <!-- code hear -->
+
+      <textarea name="" id="" cols="30" rows="10">
+
+        <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          />
+          <title>Document</title>
+          <link rel="stylesheet" href="main.css">
+        </head>
+        <body>
+            <h1>DSC FORM</h1>
+            <input type="text" placeholder="Name" class="name"></input>
+            <input type="text" placeholder="Password" class="password"></input>
+            <button class="buttonSubmit">Submit</button>
+          </body>
+      </html>
+      </textarea>
+      <textarea name="" id="" cols="30" rows="10">
+        body{
+            background-color: #000;
+        }
+      </textarea>
+    </code>
+  </body>
+</html>

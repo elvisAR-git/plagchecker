@@ -1,0 +1,170 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+
+<body>
+  <style type="text/css">
+    .navbar {
+      background-color: #563d7c;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    .navbar-default .navbar-nav li a {
+      color: #eee;
+    }
+
+    .navbar-default .navbar-nav li a:hover {
+      color: white;
+    }
+
+    th,
+    td {
+      text-align: center;
+    }
+
+    thead {
+      background-color: #e57373;
+      color: white;
+    }
+
+    #userName {
+      color: white;
+      float: right;
+    }
+  </style>
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <ul class="nav navbar-nav">
+        <li><a href="/"><b>Home</b></a></li>
+        <li><a href="/events"><b>Events</b></a></li>
+        <li><a href="/addEvent"><b>Add Event</b></a></li>
+        <li><a href="/stock"><b>Stock Page</b></a></li>
+        <li><a href="/admin"><b>Admin</b></a></li>
+        <li><a href="/logout">
+            <span class="glyphicon glyphicon-log-out" aria-hidden="true"></span>
+          </a></li>
+      </ul>
+      <p id="userName">Welcome</p>
+      <script>
+        $.get("userLogin").done(function (response) {
+
+          if (response.login != undefined) {
+            document.getElementById("userName").innerHTML = "Welcome " + response.login + "!";
+          } else {
+            window.location = "/login"
+          }
+        });
+      </script>
+    </div>
+  </nav>
+  <br><br>
+
+  <div class=" container">
+    <div class="row">
+      <p><br /></p>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4"></div>
+      <div class="col-md-4">
+        <div class="panel panel-default">
+          <form name="addEvent" method="post" action="/postEvent">
+            <p></p>
+            <table class="table table-bordered table-hover">
+              <tbody>
+                <tr>
+                  <td class="col-md-6">Day</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <select class="form-control" name="day">
+                        <option> Sunday </option>
+                        <option> Monday </option>
+                        <option> Tuesday </option>
+                        <option> Wednesday </option>
+                        <option> Thursday </option>
+                        <option> Friday </option>
+                        <option> Saturday </option>
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">Event</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="text" class="form-control" name="event" required maxlength="30">
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">Start Time</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="time" class="form-control" name="start" required>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">End Time</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="time" class="form-control" name="end" required>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">Location</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="text" class="form-control" name="location" required maxlength="100">
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">Phone</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="text" class="form-control" name="phone" required maxlength="60">
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">Extra Info</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="text" class="form-control" name="info" required maxlength="100">
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6">URL for the Extra Info</td>
+                  <td class="col-md-6">
+                    <div class="form-group">
+                      <input type="url" class="form-control" name="url" required maxlength="200">
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="col-md-6"></td>
+                  <td class="col-md-6">
+                    <input type="submit" value="Submit">
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </form>
+        </div>
+      </div>
+      <div class="col-md-4"></div>
+    </div>
+  </div>
+</body>
+
+</html>

@@ -1,13 +1,41 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
 
 body {
     font-family: 'Noto Sans HK', sans-serif;
 }
 
 code {
-    font-family: monospace !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: larger;
 }
 
 .main {
     margin: 2rem;
+}
+
+.material-tooltip {
+    text-align: left;
+}
+
+.blurry-text {
+    color: transparent;
+    filter: blur(1px);
+    -webkit-filter: blur(2px)
+}
+
+code small {
+    cursor: pointer !important;
+}
+
+.scrollable {
+    overflow-y: scroll;
+    height: 500px;
+}
+
+code hr {
+    height: 1px;
+    color: #86848420;
+    background-color: #86848420;
+    border: none;
 }

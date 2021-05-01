@@ -1,0 +1,46 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+const paymentStatus = Object.freeze({
+    pending: "pending",
+    failed: "failed",
+    success: "success"
+});
+var paymentSchema = new Schema({
+    order_id:{type: Schema.Types.ObjectId, ref: 'order', autopopulate:true},
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    category_id:{type: Schema.Types.ObjectId, ref: 'ProductCategory', autopopulate:true},
+    package_id:{type: Schema.Types.ObjectId, ref: 'saas_product_package', autopopulate:true},
+    user_id:{type: Schema.Types.ObjectId, ref: 'User', autopopulate:true},
+    claim_id:{type: Schema.Types.ObjectId, ref: 'claim', autopopulate:true},
+    payment_mode : { type: String, enum:['card','mpesa'],default: '' }, //Card / mPesa
+    amount: { type: Number, default: 0 },
+    msisdn: { type: String, default: '' },
+    payment_status: { type: String,enum: Object.values(paymentStatus), default: 'pending' },
+    transaction_id: { type: String, default: '' },
+    account_reference: { type: String, default: '' },
+    CheckoutRequestID: { type: String, default: '' },
+    MerchantRequestID: { type: String, default: '' },
+    OriginatorConversationID: { type: String, default: '' },
+    accountNumber: { type: String, default: '' },
+    transactionNumber: { type: String, default: '' },
+    stkpush_response: { type: JSON, default: '' },
+    callback_response: { type: JSON, default: '' },
+    b2b_response: { type: JSON, default: '' },
+    b2c_response: { type: JSON, default: '' },
+    is_deleted: { type: Boolean, default: false }
+}, schemaOptions);
+
+paymentSchema.plugin(autopopulate);
+
+paymentSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('payment', paymentSchema);

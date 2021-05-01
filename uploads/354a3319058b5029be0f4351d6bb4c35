@@ -1,0 +1,29 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var ApiRequestLogSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    request_api_url : {type: String, default:"" },
+    request_ip_address: {type: String, default:"" },
+    request_mac_addres: {type: String, default:"" },
+    method: {type: String, default:"" },
+    request_body: {type: String, default: "" },
+    request_header: {type: String, default:"" },
+    response_request: {type: String, default:"" },
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+ApiRequestLogSchema.plugin(autopopulate);
+
+ApiRequestLogSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('api_request_log', ApiRequestLogSchema);

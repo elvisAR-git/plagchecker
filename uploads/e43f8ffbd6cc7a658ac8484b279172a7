@@ -1,0 +1,24 @@
+import { Component, OnInit } from '@angular/core';
+import { config } from '../config';
+@Component({
+  selector: 'app-agent-register-redirect',
+  templateUrl: './agent-register-redirect.component.html',
+  styleUrls: ['./agent-register-redirect.component.scss']
+})
+
+export class AgentRegisterRedirectComponent implements OnInit {
+
+  isMain: boolean = false;
+  isPam: boolean = false;    
+  constructor() { }
+
+  ngOnInit() {
+    let data = localStorage.getItem(config.IS_MAIN)
+   
+    if(data ===  "true" ){
+      this.isMain = true;
+    }else if(data === "false"){
+      this.isPam= true
+    }
+  }
+}

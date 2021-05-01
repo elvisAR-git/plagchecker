@@ -1,0 +1,5 @@
+number = "4500"
+another_number = 6000
+
+total = int(number) + another_number
+print(total)

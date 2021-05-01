@@ -1,0 +1,54 @@
+/**
+ * Main application file
+ */
+
+'use strict';
+
+// Set default node environment to development
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.TZ = 'Asia/Kolkata';
+
+const express = require('express');
+    const mongoose = require('mongoose');
+const path = require('path');
+const config = require('./config/environment');
+const cors = require('cors');
+mongoose.Promise = global.Promise;
+
+// Connect to database
+require('./utils/db');
+
+// Setup server
+var app = express();
+var server = require('http').createServer(app);
+
+// var socketio = require('socket.io')(server);
+
+// Making directory static
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(cors());
+
+// Register schema for models
+require('../app/models')();
+require('./config/express')(app);
+require('./routes')(app);
+require('./common/common');
+
+/* run cron */
+const cronScheduler = require('./cron/');
+cronScheduler.runCron();
+/* run cron */
+
+app.get('/', (req, res) => res.send(`Bismart running on port : ${config.port}`));
+// Start server
+server.listen(config.port, config.ip, () => {
+    console.info(`Express server listening on ${config.port} and ip ${config.ip}, in ${app.get('env')} mode`);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error(`Caught exception: ${err}`);
+});
+
+process.on('unhandledRejection', (reason, p) => {
+    console.error('Unhandled Rejection at:', p, 'reason:', reason);
+});

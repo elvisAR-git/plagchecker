@@ -1,0 +1,5 @@
+
+// render index admin page
+module.exports.index = (req, res) => {
+  res.send("API is running")
+};

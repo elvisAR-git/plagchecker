@@ -1,0 +1,30 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var InsuranceCompanyInfoSchema = new Schema({
+    insurance_comapany_id : {type: Schema.Types.ObjectId, ref: 'InsuranceCompany', autopopulate:true},
+    registration_number: {type:Number},
+    contact_person:{type: String, default: null},
+    Email:{type: String, default: null},
+    Contact_No:{type: String, default: null},
+    Website_Url:{type: String, default: null},
+    Address:{type: String, default: null},
+    status: {type:Boolean, default: false},
+    is_deleted: {type: Boolean, default: false },
+}, schemaOptions);
+
+InsuranceCompanyInfoSchema.plugin(autopopulate);
+InsuranceCompanyInfoSchema.pre('save',async function (next) {
+    this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); 
+});
+
+module.exports = mongoose.model('InsuranceCompanyInfo', InsuranceCompanyInfoSchema);

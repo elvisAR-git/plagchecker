@@ -1,0 +1,28 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var crypto = require('crypto');
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var ContactInquirySchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    name: {type:String, default:null},
+    email: {type:String, default:null},
+    phone: {type:String, default:null},
+    subject: {type:String, default:null},
+    message: {type:String, default:null},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+ContactInquirySchema.plugin(autopopulate);
+
+ContactInquirySchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('ContactInquiry', ContactInquirySchema);	

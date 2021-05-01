@@ -1,0 +1,8 @@
+const button = document.getElementById("button");
+const text = document.getElementById("text");
+console.log(button);
+
+
+button.onclick = function (event) {
+  text.textContent = "Clicked!";
+};

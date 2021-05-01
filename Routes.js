@@ -5,7 +5,7 @@ const fileModel = require('./models/file.model');
 const plagChecker = require("./plagChecker");
 const fs = require('fs')
 
-mongoose.connect("mongodb+srv://root:root@cluster0.h85gf.mongodb.net/plagchecker?retryWrites=true&w=majority")
+mongoose.connect("mongodb+srv://root:root@cluster0.h85gf.mongodb.net/test?retryWrites=true&w=majority")
 
 let db = mongoose.connection
 
@@ -59,6 +59,7 @@ router.post("", async (req, res) => {
       })
       let sims = await plagChecker(f)
       f.relations = sims[0]
+      f.total = d.toString("utf-8").split("\n").length
       f.report = {
         report: sims[1]
       }

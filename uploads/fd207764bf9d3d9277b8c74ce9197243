@@ -1,0 +1,29 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var saas_packageSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false}, // SaaS ID is 0 if its belongs BISMART
+    saas_allowed_category_id:{type: Schema.Types.ObjectId, ref: 'AllowedProductCategory', autopopulate:false},
+    name:{type: String, default: null},
+    description:{type: String, default: null},
+    total_price:{type: String, default: null},
+    is_deleted: { type: Boolean, default: false },
+    }, schemaOptions);
+
+
+saas_packageSchema.plugin(autopopulate);
+
+saas_packageSchema.plugin(autopopulate);
+
+saas_packageSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('saas_package', saas_packageSchema);	

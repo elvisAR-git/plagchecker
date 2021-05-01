@@ -1,0 +1,23 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var Product_Mandatory_attributesSchema = new Schema({
+    product_id:{type: Schema.Types.ObjectId, ref: 'Product', autopopulate: true},
+    attribute_id:{type: Schema.Types.ObjectId, ref: 'product_attribute', autopopulate: true},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+Product_Mandatory_attributesSchema.plugin(autopopulate);
+
+Product_Mandatory_attributesSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('product_mandatory_attribute', Product_Mandatory_attributesSchema);

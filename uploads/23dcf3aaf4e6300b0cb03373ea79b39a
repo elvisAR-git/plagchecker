@@ -1,0 +1,35 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var crypto = require('crypto');
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var BlogCommentSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    blog_id:{type: Schema.Types.ObjectId, ref: 'Blog', autopopulate:true},
+    is_first_comment: { type: Boolean, default: false },
+    parent_id: {type: Schema.Types.ObjectId, ref: 'BlogComment', autopopulate:true, default: null} ,
+    comment_text:  { type: String, default: null},
+    user_id :{type: Schema.Types.ObjectId, ref: 'User', autopopulate:true},
+    user_type: { type: String, default: null},
+    is_replied: { type: Boolean, default: false },
+	status: {type:Boolean, default: false},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+BlogCommentSchema.plugin(autopopulate);
+
+BlogCommentSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('BlogComment', BlogCommentSchema);
+
+
+ 
+  

@@ -1,0 +1,34 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var compare_productSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false},
+    product_id:{type: Schema.Types.ObjectId, ref: 'Product', autopopulate:false},
+    package_id:{type: Schema.Types.ObjectId, ref: 'saas_product_package', autopopulate:false},
+    searchlog_id:{type: Schema.Types.ObjectId, ref: 'SaasSearchInquiryLog', autopopulate:false},
+    user_id:{type: Schema.Types.ObjectId, ref: 'User', autopopulate:false},
+    is_deleted: {type: Boolean, default: false },
+}, schemaOptions);
+
+compare_productSchema.plugin(autopopulate);
+
+/*compare_productSchema.pre('save',async function (next) {
+    let existingProduct = await mongoose.model("compare_product").find({ saas_id: this.saas_id, product_id: this.product_id, package_id: this.package_id, user_id: this.user_id, is_deleted: false })
+    if(existingProduct && existingProduct.length>0)
+    {
+        next(new Error('Product already exist in comparison'));
+    }
+
+    this.last_updated = new Date(); if (!this.isNew) { return next(); } next();
+});*/
+
+module.exports = mongoose.model('compare_product', compare_productSchema);

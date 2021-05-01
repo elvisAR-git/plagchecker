@@ -1,0 +1,24 @@
+{
+  "name": "huan1579_hw06",
+  "version": "1.0.0",
+  "description": "Assignment 6",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "echo \"Starting development server\" && nodemon index.js",
+    "start": "node index.js"
+  },
+  "author": "huan1579",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "express-session": "^1.15.6",
+    "jade": "^1.11.0",
+    "js-sha256": "^0.9.0",
+    "mysql": "^2.16.0",
+    "nodemon": "^2.0.6",
+    "pug": "^2.0.3",
+    "xml2js": "^0.4.23"
+  }
+}

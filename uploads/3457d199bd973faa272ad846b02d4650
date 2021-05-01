@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Events</title>
+	<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+</head>
+</head>
+
+<<?php 
+
+	include_once 'database.php';
+
+	$con=new mysqli($db_servername, $db_username, $db_password, $db_name);
+
+ ?>
+
+<body>
+	<style type="text/css">
+    .navbar {
+      background-color: #563d7c;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    .navbar-default .navbar-nav li a {
+      color: #eee;
+    }
+
+    .navbar-default .navbar-nav li a:hover {
+      color: white;
+    }
+
+    th,
+    td {
+      text-align: center;
+    }
+
+    thead {
+      background-color: #e57373;
+      color: white;
+    }
+
+    #userName {
+      color: white;
+      float: right;
+    }
+    .bodered{
+    	border: solid 1px grey;
+    	border-radius: 10px;
+    	padding: 2%;
+    	box-shadow: .4em .3em 1em grey;
+    }
+
+  </style>
+	<hr>
+	 <div class="container p-3 shadow">
+  <h2 style="text-decoration: underline;">Homework 8</h2>
+  <?php 
+  	$column = "";
+  	$filter = "";
+  	if (sizeof($_GET) > 0) {
+  		# code...
+  		$column = $_GET["column"];
+  		$filter = $_GET["filter"];
+
+  		$msg = "<p>Showing <b>$column column</b> filtered by <b>$filter</b></p>";
+  		echo $msg;
+  	}
+
+   ?>
+   <a href="/"><button class="btn-primary btn">Reload Contents</button></a>
+   <hr>
+    <table class="table table-striped bodered" id="eventsTable">
+      <thead>
+        <tr>
+          <th scope="col">Day</th>
+          <th scope="col">Event</th>
+          <th scope="col">Time</th>
+          <th scope="col">
+            Event Location <br />
+            (Virtual or Physical)
+          </th>
+          <th scope="col">Phone Number</th>
+          <th scope="col">
+            Extra Info <br />
+            (URL)
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+      	<?php
+			$sel = "SELECT * FROM tbl_events";
+
+			if ($column == "Day" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_day LIKE '%$filter%'";
+			}elseif ($column == "Event" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_event LIKE '%$filter%'";
+			}elseif ($column == "Start" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_start LIKE '%$filter%'";
+			}elseif ($column == "End" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_end LIKE '%$filter%'";
+			}elseif ($column == "Location" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_location LIKE '%$filter%'";
+			}elseif ($column == "phone" and $filter !="") {
+				# code...
+				$sel = "SELECT * FROM tbl_events WHERE event_phone LIKE '%$filter%'";
+			}else{
+				# code...
+				$sel = "SELECT * FROM tbl_events";
+			}
+			$rs = $con->query($sel);
+				while($rws = $rs->fetch_assoc()){
+			?>
+				<tr>
+					<td><?php echo $rws['event_day'];?></td>
+					<td><?php echo $rws['event_event']?></td>
+					<td><?php echo $rws['event_start']; echo " - "; echo $rws['event_end']?></td>
+					<td><?php echo $rws['event_location']?></td>
+					<td><?php echo $rws['event_phone']?></td>
+					<td><a href="<?php echo $rws['event_url']?>"><?php echo $rws['event_info']?></a></td>
+				<tr>
+		<?php
+				}
+			?>  
+		<tbody>
+    </table>
+    <hr>
+    <span class="small caption" id="count"></span>
+  </div>
+
+  <form class="form container">
+  	<span class="small caption">Select column</span>
+  	<select name="column" class="option">
+  		<option>Day</option>
+  		<option>Event</option>
+  		<option>Start</option>
+  		<option>End</option>
+  		<option>Location</option>
+  		<option>phone</option>
+  	</select>
+  	<hr>
+  	<br>
+  	<input type="text" name="filter" placeholder="Contains" required>
+  	<input type="submit" class="btn btn-primary" value="Filter">
+  </form>
+
+</body>
+</html>

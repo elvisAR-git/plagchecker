@@ -33,7 +33,12 @@ let fileSchema = mongoose.Schema({
     plagiarised_lines: [{
         type: Object,
         required: false
-    }]
+    }],
+    total: {
+        type: Number,
+        require: false,
+        default: 0
+    }
 
 })
 

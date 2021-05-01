@@ -1,0 +1,35 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var premium_calculation_templateSchema = new Schema({
+    name:{type: String, default: null},
+    type:{
+        type: String, 
+        default: 'percentage',
+        enum: ["fix", "percentage", null]
+    },
+    value:{type: Number, default: null},
+    is_conditional: { type: Boolean, default: false },
+    value_1:{type: Number, default: null},
+    condition_1:{type: String, default: null},
+    operator_1:{type: String, default: null},
+    value_2:{type: Number, default: null},
+    condition_2:{type: String, default: null},
+    operator_2:{type: String, default: null},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+premium_calculation_templateSchema.plugin(autopopulate);
+
+premium_calculation_templateSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('premium_calculation_template', premium_calculation_templateSchema);

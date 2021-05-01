@@ -1,0 +1,33 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var crypto = require('crypto');
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+
+var PermissionTORoleSchema = new Schema({
+    saas_id :{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    module_id : {type: Schema.Types.ObjectId, ref: 'Module', autopopulate:true},
+	permission_id: [{type: Schema.Types.ObjectId, ref: 'Permission', autopopulate:true}],
+	role_id: {type: Schema.Types.ObjectId, ref: 'Role', autopopulate:true},
+	status: {type: Boolean, default: false},
+    is_deleted: { type: Boolean, default: false },
+    Module_code: {type:String, default: null}
+}, schemaOptions);
+
+PermissionTORoleSchema.plugin(autopopulate);
+
+PermissionTORoleSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('RolePermission', PermissionTORoleSchema);
+
+
+
+

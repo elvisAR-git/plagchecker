@@ -1,0 +1,400 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var package_premium_calculation_ratesSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    package_id:{type: Schema.Types.ObjectId, ref: 'saas_product_package', autopopulate:true},
+    product_id:{type: Schema.Types.ObjectId, ref: 'Product', autopopulate:true},
+    category_id:{type: Schema.Types.ObjectId, ref: 'ProductCategory', autopopulate:true},
+
+    //isCustomize only: home insurance
+    rate_home_value:{type: Number, default: 0}, //Home Insurance
+    rate_home_electronics_value:{type: Number, default: 0}, //Home Insurance
+    rate_household_contents:{type: Number, default: 0 }, //Home Insurance
+    rate_home_employees:{type: Number, default: 0 }, //Home Insurance //amount
+    rate_owner_liability:{type: Number, default: 0}, //Home Insurance
+    rate_occupier_liability:{type: Number, default: 0}, //Home Insurance
+    electronics_goods_rate:{type: Number, default: 0}, //Home Insurance
+    
+    primary_school_rate:{type: Number, default: 0}, //Term Life Insurance
+    secondary_school_rate:{type: Number, default:  0}, //Term Life Insurance
+    university_rate:{type: Number, default: 0}, //Term Life Insurance
+
+
+    PRIVATE : {
+
+        motor_value1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate1:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate2:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate3:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate4:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        //political_risks_minimum_premium //if political_risks is greater = political_risks else political_risks_minimum_premium
+        //excess_protector_minimum_premium //if excess_protector is greater = excess_protector else excess_protector_minimum_premium
+
+        excess_protector_rate:{type: Number, default: 0}, //rate
+        excess_protector_minimum_premium : {type:Number, default:0},//Motor life Insurance //amount
+        political_risks_rate:{type: Number, default: 0}, //rate
+        political_risks_minimum_premium : {type:Number, default:0}, //amount
+
+        personalAccident : {type:Number, default:0}, //Motor //amount
+
+        courtesy_car_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        road_rescue_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        forced_atm_rate:{type: Number, default: 0}, ///Motor Insurance //amount
+        rescue_rate1:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate2:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate3:{type: Number, default: 0}, //Motor Insurance
+        forced_atm_minimum_amount:{type: Number, default: 0}, //rate
+
+        comprehensiveRate:{type: Number, default: 0}, //rate
+        comprehensiveRateMinimumPremium:{type: Number, default: 0}, //amount
+        thirdPartyAmount:{type: Number, default: 0}, //amount
+        theftAndFireRate:{type: Number, default: 0}, //rate
+        theftAndFireRateMinimumPremium:{type: Number, default: 0}, //amount
+
+    },
+    PSVCHAUFFEUR : {
+
+        motor_value1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate1:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate2:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate3:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate4:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        //political_risks_minimum_premium //if political_risks is greater = political_risks else political_risks_minimum_premium
+        //excess_protector_minimum_premium //if excess_protector is greater = excess_protector else excess_protector_minimum_premium
+
+        excess_protector_rate:{type: Number, default: 0}, //rate //optional rates
+        excess_protector_minimum_premium : {type:Number, default:0},//Motor Insurance //amount
+        political_risks_rate:{type: Number, default: 0}, //rate //optional rates
+        political_risks_minimum_premium : {type:Number, default:0}, //amount
+
+        personalAccident : {type:Number, default:0}, //Motor //amount
+
+        courtesy_car_rate:{type: Number, default: 0}, //Motor Insurance //amount //optional rates
+        road_rescue_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        forced_atm_rate:{type: Number, default: 0}, ///Motor Insurance //amount //optional rates
+        rescue_rate1:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate2:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate3:{type: Number, default: 0}, //Motor Insurance
+        forced_atm_minimum_amount:{type: Number, default: 0}, //rate
+
+        comprehensiveRate:{type: Number, default: 0}, //rate
+        comprehensiveRateMinimumPremium:{type: Number, default: 0}, //amount
+        thirdPartyAmount:{type: Number, default: 0}, //amount
+        theftAndFireRate:{type: Number, default: 0}, //rate
+        theftAndFireRateMinimumPremium:{type: Number, default: 0}, //amount
+
+    },
+    PSVSELF : {
+
+        motor_value1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate1:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate2:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate3:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate4:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        //political_risks_minimum_premium //if political_risks is greater = political_risks else political_risks_minimum_premium
+        //excess_protector_minimum_premium //if excess_protector is greater = excess_protector else excess_protector_minimum_premium
+
+        excess_protector_rate:{type: Number, default: 0}, //rate
+        excess_protector_minimum_premium : {type:Number, default:0},//Motor Insurance //amount
+        political_risks_rate:{type: Number, default: 0}, //rate
+        political_risks_minimum_premium : {type:Number, default:0}, //amount
+
+        personalAccident : {type:Number, default:0}, //Motor //amount
+
+        courtesy_car_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        road_rescue_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        forced_atm_rate:{type: Number, default: 0}, ///Motor Insurance //amount
+        rescue_rate1:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate2:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate3:{type: Number, default: 0}, //Motor Insurance
+        forced_atm_minimum_amount:{type: Number, default: 0}, //rate
+
+        comprehensiveRate:{type: Number, default: 0}, //rate
+        comprehensiveRateMinimumPremium:{type: Number, default: 0}, //amount
+        thirdPartyAmount:{type: Number, default: 0}, //amount
+        theftAndFireRate:{type: Number, default: 0}, //rate
+        theftAndFireRateMinimumPremium:{type: Number, default: 0}, //amount
+
+    },
+    COMMERCIALOWNGOODS : {
+
+        motor_value1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate1:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate2:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate3:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate4:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        //political_risks_minimum_premium //if political_risks is greater = political_risks else political_risks_minimum_premium
+        //excess_protector_minimum_premium //if excess_protector is greater = excess_protector else excess_protector_minimum_premium
+
+        excess_protector_rate:{type: Number, default: 0}, //rate
+        excess_protector_minimum_premium : {type:Number, default:0},//Motor Insurance //amount
+        political_risks_rate:{type: Number, default: 0}, //rate
+        political_risks_minimum_premium : {type:Number, default:0}, //amount
+
+        personalAccident : {type:Number, default:0}, //Motor //amount
+
+        courtesy_car_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        road_rescue_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        forced_atm_rate:{type: Number, default: 0}, ///Motor Insurance //amount
+        rescue_rate1:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate2:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate3:{type: Number, default: 0}, //Motor Insurance
+        forced_atm_minimum_amount:{type: Number, default: 0}, //rate
+
+        comprehensiveRate:{type: Number, default: 0}, //rate
+        comprehensiveRateMinimumPremium:{type: Number, default: 0}, //amount
+        thirdPartyAmount:{type: Number, default: 0}, //amount
+        theftAndFireRate:{type: Number, default: 0}, //rate
+        theftAndFireRateMinimumPremium:{type: Number, default: 0}, //amount
+
+    },
+    COMMERCIALGENERAL : {
+        motor_value1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year1:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate1:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year2:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate2:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year3:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate3:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        motor_value4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_year4:{
+            from : {type: Number, default: 0},
+            to : {type: Number, default: 0}
+        }, //Motor Insurance
+        motor_basic_rate4:{type: Number, default: 0}, //Motor Insurance //comprehensiveRate
+
+        //political_risks_minimum_premium //if political_risks is greater = political_risks else political_risks_minimum_premium
+        //excess_protector_minimum_premium //if excess_protector is greater = excess_protector else excess_protector_minimum_premium
+
+        excess_protector_rate:{type: Number, default: 0}, //rate
+        excess_protector_minimum_premium : {type:Number, default:0},//Motor Insurance //amount
+        political_risks_rate:{type: Number, default: 0}, //rate
+        political_risks_minimum_premium : {type:Number, default:0}, //amount
+
+        personalAccident : {type:Number, default:0}, //Motor //amount
+
+        courtesy_car_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        road_rescue_rate:{type: Number, default: 0}, //Motor Insurance //amount
+        forced_atm_rate:{type: Number, default: 0}, ///Motor Insurance //amount
+        rescue_rate1:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate2:{type: Number, default: 0}, //Motor Insurance
+        rescue_rate3:{type: Number, default: 0}, //Motor Insurance
+        forced_atm_minimum_amount:{type: Number, default: 0}, //rate
+
+        comprehensiveRate:{type: Number, default: 0}, //rate
+        comprehensiveRateMinimumPremium:{type: Number, default: 0}, //amount
+        thirdPartyAmount:{type: Number, default: 0}, //amount
+        theftAndFireRate:{type: Number, default: 0}, //rate
+        theftAndFireRateMinimumPremium:{type: Number, default: 0}, //amount
+    },
+
+    //accident insurance
+    benefits:{type: Array, default: []},
+    premium:{type: Array, default: []},
+
+    //funeral insurance
+    individual: {
+        individualArray: {type: [JSON], default: []},
+    },
+    group: {
+        groupArray: {type: [JSON], default: []},
+    },
+
+    /* Start Medical Cover */
+    coverType: {type: String},
+    familySize: {type: String},
+    inpatientLimit:{type: Number, default: 0},
+    outpatientLimit:{type: Number, default: 0},
+    maternityLimit:{type: Number, default: 0},
+    dentalLimit:{type: Number, default: 0},
+    opticalLimit:{type: Number, default: 0},
+    evacuation:{type: Number, default: 0},
+    lastExpense:{type: Number, default: 0},
+    groupExpense:{type: Number, default: 0},
+    /* End Medical Cover */
+
+    is_deleted: { type: Boolean, default: false }
+    //(Annual school fees selected*number of years)* rate
+}, schemaOptions);
+
+package_premium_calculation_ratesSchema.plugin(autopopulate);
+
+package_premium_calculation_ratesSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('package_premium_calculation_rates', package_premium_calculation_ratesSchema);

@@ -1,0 +1,3585 @@
+const mongoose = require("mongoose");
+let request = require("request");
+const puppeteer = require("puppeteer");
+var _ = require("lodash");
+let moment = require("moment");
+let fs = require("fs");
+let pdf = require("html-pdf");
+let config = require("../../config/environment");
+let credentials = config.credentials;
+var randomstring = require("randomstring");
+const apiLog = require("../ApiLog/ApiLog.controller");
+const combinePdfs = require("combine-multiple-pdfs"); //added new module to combine pdfs
+
+const sendSMS = require("../../sms");
+
+const UserModel = mongoose.model("User");
+const agentCommissionModel = mongoose.model("agentCommission");
+const SaasModel = mongoose.model("Saas");
+const saasNetworkModel = mongoose.model("SaasNetwork");
+const orderModel = mongoose.model("order");
+const productModel = mongoose.model("Product");
+const account_entryModel = mongoose.model("account_entry");
+const paymentModel = mongoose.model("payment");
+const insurance_kycModel = mongoose.model("insurance_kyc");
+const health_insurance_kycModel = mongoose.model("health_insurance_kyc");
+const medical_cover_kycModel = mongoose.model("medical_cover_kyc");
+const InsuranceCompanyModel = mongoose.model("InsuranceCompany");
+const InsuranceCompanyInfoModel = mongoose.model("InsuranceCompanyInfo");
+const saas_contact_informationModel = mongoose.model(
+  "saas_contact_information"
+);
+const saas_product_packageModel = mongoose.model("saas_product_package");
+const category_customizeModel = mongoose.model("category_customize");
+const saas_mpesa_configurationModel = mongoose.model(
+  "saas_mpesa_configuration"
+);
+const claimModel = mongoose.model("claim");
+const SaasSearchInquiryLogModel = mongoose.model("SaasSearchInquiryLog");
+
+let EmailTemplates = require("swig-email-templates");
+let path = require("path"),
+  templatesDir = path.join(__dirname, "../../templates"),
+  mailtemplate = require("../../templates/searchLeadReport"),
+  mailtemplate1 = require("../../templates/orderLeadEmail"),
+  mailtemplate2 = require("../../templates/paymentLeadsEmail");
+const mail = require("../../utils/mailSend");
+const { timeStamp } = require("console");
+let templates = new EmailTemplates();
+const sendRiskNoteMail = async (data, kycType, filename) => {
+  let saasData = await SaasModel.findOne({
+    _id: data.saas_id._id,
+    is_deleted: false,
+  });
+  let companyData = await InsuranceCompanyModel.findOne({
+    _id: saasData.insurance_comapany_id._id,
+    is_deleted: false,
+  });
+  let companyInfoData = await InsuranceCompanyInfoModel.findOne({
+    insurance_comapany_id: companyData._id,
+    is_deleted: false,
+  });
+  let saas_contact_informationData = await saas_contact_informationModel.findOne(
+    { saas_id: saasData._id, is_deleted: false }
+  );
+  let saas_product_packageData = await saas_product_packageModel.findOne({
+    _id: data.package_id._id,
+    is_deleted: false,
+  });
+  let SaaSCompanyProductsList = await saas_product_packageModel
+    .find({ saas_id: data.saas_id._id, is_deleted: false })
+    .sort({ create_date: -1 })
+    .limit(5)
+    .skip(0);
+
+  let insurer_email = await productModel.findOne({
+    _id: saas_product_packageData.product_id,
+  });
+  console.log(insurer_email);
+  insurer_email = insurer_email.insurer_email;
+  //let list='<ul style="list-style-type:none;">';
+  let list = "<ul>";
+  let packageList = "";
+  for (let i in SaaSCompanyProductsList) {
+    if (packageList == "") {
+      packageList = "<li>" + SaaSCompanyProductsList[i].name + "</li>";
+    } else {
+      packageList = packageList.concat(
+        "<li>" + SaaSCompanyProductsList[i].name + "</li>"
+      );
+    }
+  }
+  let finalList = list.concat(packageList);
+  finalList = finalList.concat("</ul>");
+
+  let dateNow = new Date();
+  let cover_from = moment(dateNow).format("MM-DD-YYYY");
+  let cover_to = moment(dateNow.setMonth(dateNow.getMonth() + 1)).format(
+    "MM-DD-YYYY"
+  );
+
+  let policyDoc = await category_customizeModel.findOne({
+    category_id: data.category_id._id,
+    saas_id: data.saas_id._id,
+    is_deleted: false,
+  });
+  let policyPdfFile = "";
+  if (policyDoc) {
+    //  policyPdfFile = policyDoc['policy_document'];
+  }
+  let userData = await UserModel.findOne({
+    _id: data.user_id._id,
+    is_deleted: false,
+  });
+  let uname = userData["username"].split(" ");
+
+  let html =
+    "Dear " +
+    uname[0] +
+    ",<br><br>Thank you for filling in your insurance application. Find attached KYC document." +
+    // '<br>Find your '+saas_product_packageData.name+' application information.' +
+    "<br>If you have any questions, contact us on " +
+    saas_contact_informationData.email_primary +
+    "<br><br><b>Other insurance covers:</b>" +
+    "<br>Access other insurance products." +
+    "<br>" +
+    finalList +
+    "<br><br>Regards" +
+    "<br>" +
+    companyInfoData.Address +
+    '<br><img src="' +
+    config.URL +
+    "/uploads/" +
+    companyData.logo +
+    '" heigth="50" width="100">';
+
+  let allEmails;
+  if (kycType == "Health") {
+    allEmails = [data.contactInformation.email, userData.email];
+  } else {
+    allEmails = [data.email, userData.email];
+  }
+  allEmails.push(insurer_email);
+  await mail.mailSendPDF(allEmails, "Your Application Details", html, [
+    filename,
+  ]);
+};
+
+const getsaas_mpesa_configuration = async (saas_id, agent_id) => {
+  let saasData = await SaasModel.findOne({ _id: saas_id, is_deleted: false });
+  let saas_mpesa_configurationData;
+  if (saasData.useBismartMpesa) {
+    let getMainSaas = await SaasModel.findOne({
+      isMain: true,
+      is_deleted: false,
+    });
+    if (agent_id == "") {
+      saas_mpesa_configurationData = await saas_mpesa_configurationModel.findOne(
+        { saas_id: getMainSaas._id, is_deleted: false }
+      );
+    } else {
+      saas_mpesa_configurationData = await saas_mpesa_configurationModel.findOne(
+        { saas_id: getMainSaas._id, agent_id: agent_id, is_deleted: false }
+      );
+    }
+  } else {
+    if (agent_id == "") {
+      saas_mpesa_configurationData = await saas_mpesa_configurationModel.findOne(
+        { saas_id: saas_id, is_deleted: false }
+      );
+    } else {
+      saas_mpesa_configurationData = await saas_mpesa_configurationModel.findOne(
+        { saas_id: saas_id, agent_id: agent_id, is_deleted: false }
+      );
+    }
+  }
+  return saas_mpesa_configurationData;
+};
+
+exports.access_token = async (req, res) => {
+  let URL;
+  if (req.body.transactionType == "C2B") {
+    URL =
+      "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+  } else {
+    URL =
+      "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+  }
+  //URL = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
+
+  let saas_mpesa_configurationData = await getsaas_mpesa_configuration(
+    mongoose.Types.ObjectId(req.params.saas_id),
+    ""
+  );
+  let auths = new Buffer(
+    saas_mpesa_configurationData[req.body.transactionType].consumer_key +
+      ":" +
+      saas_mpesa_configurationData[req.body.transactionType].consumer_secret
+  ).toString("base64");
+  try {
+    request(
+      {
+        url: URL,
+        headers: {
+          Authorization: "Basic " + auths,
+        },
+      },
+      function (error, response, body) {
+        if (error) {
+          console.log(error.message);
+        } else {
+          console.log("response----------------->", response.body);
+          if (!body) {
+            res.send(
+              send_response(
+                null,
+                true,
+                "Something went wrong, please try again!"
+              )
+            );
+          } else {
+            console.log("-------body-----");
+            console.log(body);
+            res.send(JSON.parse(body));
+          }
+        }
+      }
+    );
+  } catch (error) {
+    res.send(send_response(null, true, error.message));
+  }
+};
+
+exports.registration_c2b = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/c2b/v1/registerurl";
+  console.log(URL);
+  let auths = req.body.access_token;
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        ShortCode: req.body.shortcode,
+        ResponseType: "Completed", //Confirmed
+        ConfirmationURL: config.URL + "/api/Payment/confirmation",
+        ValidationURL: config.URL + "/api/Payment/validation_url",
+      },
+    },
+    function (error, response, body) {
+      if (error) {
+        console.log(error.message);
+        res.send(error.message);
+      } else {
+        res.send(body);
+      }
+    }
+  );
+};
+
+exports.confirmation = async (req, res) => {
+  console.log("in confirmation..");
+  console.log(req.body);
+};
+
+exports.timeout_url = async (req, res) => {
+  console.log("in timeout_url..");
+  let obj = req.body.Result;
+  let paymentData = await paymentModel.findOne({
+    OriginatorConversationID: obj.OriginatorConversationID,
+  });
+  if (paymentData) {
+    await paymentModel.updateOne(
+      { _id: paymentData._id },
+      { $set: { payment_status: "failed" } }
+    );
+    console.log("Data found!");
+  }
+};
+
+exports.result_url = async (req, res) => {
+  console.log("in result_url..");
+  let obj = req.body.Result;
+  let paymentData = await paymentModel.findOne({
+    OriginatorConversationID: obj.OriginatorConversationID,
+  });
+  if (paymentData) {
+    if (obj.ResultCode == 0) {
+      if (paymentData.claim_id && paymentData.claim_id != "") {
+        await claimModel.updateOne(
+          { _id: paymentData.claim_id._id },
+          { $set: { status: "close" } }
+        );
+      }
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "success",
+          },
+        }
+      );
+      //mail here
+      console.log("Data found If!");
+    } else {
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "failed",
+          },
+        }
+      );
+      console.log("Data found Else!");
+    }
+  } else {
+    await paymentModel.updateOne(
+      { _id: paymentData._id },
+      {
+        $set: {
+          callback_response: obj,
+          transaction_id: obj.TransactionID,
+          payment_status: "failed",
+        },
+      }
+    );
+    console.log("Data not found!");
+  }
+};
+exports.validation_url = async (req, res) => {
+  console.log("in validation_url..");
+  // console.log(req.body);
+  res.send(req.body);
+};
+
+exports.callback_url = async (req, res) => {
+  console.log("call back URL...");
+  let obj = req.body.Body.stkCallback;
+  // console.log(obj);
+  let paymentData = await paymentModel.findOne({
+    MerchantRequestID: obj.MerchantRequestID,
+  });
+  if (paymentData) {
+    if (obj.ResultCode == 0) {
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "success",
+          },
+        }
+      );
+      //mail here
+      console.log("Data found If!");
+    } else {
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "failed",
+          },
+        }
+      );
+      console.log("Data found Else!");
+    }
+  } else {
+    await paymentModel.updateOne(
+      { _id: paymentData._id },
+      {
+        $set: {
+          callback_response: obj,
+          transaction_id: obj.TransactionID,
+          payment_status: "failed",
+        },
+      }
+    );
+    console.log("Data not found!");
+  }
+
+  res.send(obj);
+};
+
+exports.simulate = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/c2b/v1/simulate";
+  console.log(URL);
+  let auths = req.body.access_token;
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        ShortCode: req.body.shortcode,
+        CommandID: "CustomerPayBillOnline",
+        Amount: req.body.amount,
+        Msisdn: req.body.msisdn,
+        BillRefNumber: req.body.billrefnumber,
+      },
+    },
+    function (error, response, body) {
+      if (error) {
+        // console.log(error.message);
+        res.send(error.message);
+      } else {
+        res.send(body);
+      }
+    }
+  );
+};
+
+exports.balance = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/accountbalance/v1/query";
+  console.log(URL);
+  let auths = req.body.access_token;
+
+  let SecurityCredential = new Buffer(
+    req.body.shortcode + "" + credentials.auth.password
+  ).toString("base64");
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        Initiator: req.body.username,
+        SecurityCredential: SecurityCredential,
+        CommandID: "AccountBalance",
+        PartyA: req.body.shortcode, //short code,
+        IdentifierType: "4",
+        Remarks: req.body.remarks,
+        QueueTimeOutURL: config.URL + "/api/Payment/timeout_url",
+        ResultURL: config.URL + "/api/Payment/result_url",
+      },
+    },
+    function (error, response, body) {
+      if (error) {
+        // console.log(error.message);
+        res.send(error.message);
+      } else {
+        res.send(body);
+      }
+    }
+  );
+};
+
+// Handle Pay later
+exports.paylater = async function (req, res) {
+  /*
+    Expecting package_id, saas_id and user_id
+  */
+  let packageData = await saas_product_packageModel.findOne({
+    _id: req.body.package_id,
+  });
+
+  let userData = await UserModel.findOne({ _id: req.body.user_id });
+  let Saas = await SaasModel.findOne({ _id: req.body.saas_id });
+
+  let saasNetwork = await saasNetworkModel.findOne({ saas_id: Saas._id });
+  let companyData = await InsuranceCompanyModel.findOne({
+    _id: Saas.insurance_comapany_id._id,
+    is_deleted: false,
+  });
+  let InsuranceCompanyInfoData = await InsuranceCompanyInfoModel.findOne({
+    insurance_comapany_id: Saas.insurance_comapany_id,
+    is_deleted: false,
+  });
+
+  let html = `<p class="message">
+  Dear ${userData.username},<br>
+  This is to inform you that we have received your insurance order application for ${Saas.name}. Your order has been marked pending.<br>You can however perform this payment at your earliest convinience from your account or buy using the link below
+  </p>
+  <br>
+  <div class="regards">
+  <p class="regards-message">
+    Regards, ${Saas.name} Team.<br />${InsuranceCompanyInfoData.Address}
+  </p>
+  <a href="${saasNetwork.domain}/account/myorder" class="btn">Pay for order</a>
+  </div>`;
+
+  mail
+    .mailSend(
+      userData.email,
+      "Order purchase notification from " + Saas.name,
+      html,
+      Saas,
+      saasNetwork
+    )
+    .then((response) => {
+      res.send({
+        error: null,
+        message: "Please check your mail at, " + userData.email,
+      });
+    })
+    .catch((response) => {
+      res.send({ error: null, message: "An error occured" });
+    });
+};
+
+// safaricom STK
+exports.stk = async (req, res) => {
+  // send progress SMS
+  /* send a message via SMS to notify the user that the transaction is underway
+   */
+  // console.log(req.body);
+
+  var saas_id = req.body.saas_id;
+  let saasData = await SaasModel.findOne({ _id: saas_id });
+  let companyData = await InsuranceCompanyModel.findOne({
+    _id: saasData.insurance_comapany_id._id,
+    is_deleted: false,
+  });
+  let package = await saas_product_packageModel.findOne({
+    _id: req.body.package_id,
+  });
+  let user = await UserModel.findOne({ _id: req.body.user_id });
+  let saas_mpesa_configurationData = await getsaas_mpesa_configuration(
+    mongoose.Types.ObjectId(req.body.saas_id),
+    ""
+  );
+  // console.log("mpesaconf", saas_mpesa_configurationData);
+  // Sms object
+  let message = `Hello, ${user.username}, Thank you for purchasing ${
+    package.name
+  } package from ${
+    companyData.name
+  }, Your Transaction is in progress and will be processed shortly.\n
+  MPESA NUMBER TO BE BILLED: ${req.body.msisdn}\n
+  TOTAL AMOUNT: KES ${req.body.amount}\n
+  MPESA PAYBILL: ${saas_mpesa_configurationData.shortcode.toString()}
+      `;
+  let sms = {
+    from: companyData.name,
+    receivers: [req.body.msisdn],
+    message,
+  };
+  // Call the send SMS function that will use africa'stalking sms api to send message to user
+  sendSMS(sms)
+    .then((response) => {
+      // message send was successful
+      console.log("SUCCESS:", response.data);
+    })
+    .catch((err) => {
+      // message send failed
+      console.log("FAILED:", err);
+    });
+  //  calling Mail function
+  let saas_network = await saasNetworkModel.findOne({ saas_id: saasData._id });
+  message += `<br>
+            Regards<br> ${companyData.name} Team.`;
+  mail.mailSend(
+    user.email,
+    "Transaction Notification from " + companyData.name,
+    message,
+    saasData,
+    saas_network
+  );
+
+  let URL = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
+  console.log(URL);
+  let auths = req.body.access_token;
+
+  let dateNow = new Date();
+  let timestamp = moment(dateNow).format("YYYYMMDDHHmmss");
+
+  let password = new Buffer.from(
+    saas_mpesa_configurationData.shortcode +
+      saas_mpesa_configurationData.lipana_passkey +
+      timestamp
+  ).toString("base64");
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        BusinessShortCode: saas_mpesa_configurationData.shortcode.toString(), //Lipa Na Mpesa Online Shortcode:
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: req.body.amount,
+        PartyA: req.body.msisdn, //phone number
+        PartyB: saas_mpesa_configurationData.shortcode.toString(), //Lipa Na Mpesa Online Shortcode:
+        PhoneNumber: req.body.msisdn,
+        CallBackURL: config.URL + "/api/Payment/callback_url",
+        AccountReference: req.body.account_reference,
+        TransactionDesc: req.body.transaction_description,
+      },
+    },
+    async function (error, response, body) {
+      var saas_id = req.body.saas_id;
+      let saas = await SaasModel.findOne({ _id: saas_id });
+      let companyData = await InsuranceCompanyModel.findOne({
+        _id: saas.insurance_comapany_id._id,
+        is_deleted: false,
+      });
+      let package = await saas_product_packageModel.findOne({
+        _id: req.body.package_id,
+      });
+      let user = await UserModel.findOne({ _id: req.body.user_id });
+
+      if (error) {
+        // send Fail message
+        let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} Failed because of ${error.message}`;
+        let sms = {
+          from: companyData.name,
+          receivers: [req.body.msisdn],
+          message,
+        };
+        // Call the send SMS function that will use africa'stalking sms api to send message to user
+        sendSMS(sms)
+          .then((response) => {
+            // message send was successful
+            console.log("SUCCESS:", response.data);
+          })
+          .catch((err) => {
+            // message send failed
+            console.log("FAILED:", err);
+          });
+
+        mail.mailSend(
+          user.email,
+          "Transaction Failuire Notification from " + companyData.name,
+          message,
+          saasData,
+          saas_network
+        );
+        res.send(send_response(null, true, error.message));
+      } else {
+        if (body.errorCode) {
+          //   Send SMS feedback if transaction failed or passed
+          // send Fail message
+          let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} Failed, please try again`;
+          let sms = {
+            from: companyData.name,
+            receivers: [req.body.msisdn],
+            message,
+          };
+
+          // Call the send SMS function that will use africa'stalking sms api to send message to user
+          sendSMS(sms)
+            .then((response) => {
+              // message send was successful
+              console.log("SUCCESS:", response);
+            })
+            .catch((err) => {
+              // message send failed
+              console.log("FAILED:", err);
+            });
+          mail.mailSend(
+            user.email,
+            "Transaction Failure Notification from " + companyData.name,
+            message,
+            saasData,
+            saas_network
+          );
+          body.errorMessage = "Transaction failed, Please try again";
+          res.send(send_response(null, true, body.errorMessage));
+        } else {
+          let jsonData = {
+            order_id: req.body.order_id,
+            saas_id: req.body.saas_id,
+            category_id: req.body.category_id,
+            package_id: req.body.package_id,
+            user_id: req.body.user_id,
+            payment_mode: "mpesa",
+            amount: req.body.amount,
+            msisdn: req.body.msisdn,
+            account_reference: req.body.account_reference,
+            transaction_id: body.transaction_id,
+            MerchantRequestID: body.MerchantRequestID,
+            CheckoutRequestID: body.CheckoutRequestID,
+            stkpush_response: body,
+          };
+          let stkData = await paymentModel.create(jsonData);
+          // send success Message
+
+          let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} was successfull.Total amount billed: ${req.body.amount}. Additional information is available on our account.`;
+
+          // message to user
+          if (stkData.payment_status == "pending") {
+            message = `Dear, ${user.username}, This is to inform you that your payment of the ${package.name} package from ${companyData.name} has been marked pending payment. you can make this payment any time from your account. ${saas_network.domain}/account/myorder`;
+          }
+          let sms = {
+            from: companyData.name,
+            receivers: [req.body.msisdn],
+            message,
+          };
+          sendSMS(sms)
+            .then((response) => {
+              // message send was successful
+              console.log("SUCCESS:", response);
+            })
+            .catch((err) => {
+              // message send failed
+              console.log("FAILED:", err);
+            });
+          if (stkData.payment_status == "pending") {
+            message += `<br>
+            Regards<br> ${companyData.name} Team.`;
+            mail.mailSend(
+              user.email,
+              "Transaction Notification from " + companyData.name,
+              message,
+              saasData,
+              saas_network
+            );
+          } else if (
+            stkData.payment_status == "complete" ||
+            stkData.payment_status == "processed"
+          ) {
+            message = `
+              Dear ${user.username},<br><br>
+                We have received your payment of Ksh. ${req.body.amount} for the 
+                ${package.name} from ${companyData.name}. Additional information is available in your account<br>
+                If you have any questions concerning your payment, write to us on ${companyData.Email}
+                <br>
+                Regards<br> ${companyData.name} Team.
+            `;
+            mail.mailSend(
+              user.email,
+              "Thank you for your payment" + companyData.name,
+              message,
+              saasData,
+              saas_network
+            );
+          }
+
+          // console.log("MPESA->", response);
+          res.send(send_response(stkData, false, ""));
+        }
+      }
+    }
+  );
+};
+
+exports.britam_stk = async (req, res) => {
+  /* QUERY BRITAM'S MPESA API
+
+  // send progress SMS
+
+
+  /* send a message via SMS to notify the user that the transaction is underway
+   */
+
+  var saas_id = req.body.saas_id;
+  let saasData = await SaasModel.findOne({ _id: saas_id });
+  let companyData = await InsuranceCompanyModel.findOne({
+    _id: saasData.insurance_comapany_id._id,
+    is_deleted: false,
+  });
+  let package = await saas_product_packageModel.findOne({
+    _id: req.body.package_id,
+  });
+  let user = await UserModel.findOne({ _id: req.body.user_id });
+  let saas_mpesa_configurationData = await getsaas_mpesa_configuration(
+    mongoose.Types.ObjectId(req.body.saas_id),
+    ""
+  );
+  // Sms object
+  let message = `Hello, ${user.username}, Thank you for purchasing ${package.name} package from ${companyData.name}, Your Transaction is in progress and will be processed shortly.\n
+  MPESA ACCOUNT: ${req.body.msisdn}\n
+  TOTAL AMOUNT: KES ${req.body.amount}\n
+  MPESA PAYBILL: 827142
+      `;
+  let sms = {
+    from: companyData.name,
+    receivers: [req.body.msisdn],
+    message,
+  };
+
+  // Call the send SMS function that will use the sms api to send message to user
+  sendSMS(sms)
+    .then((response) => {
+      // message send was successful
+      console.log("SUCCESS:", response.data);
+    })
+    .catch((err) => {
+      // message send failed
+      console.log("FAILED:", err);
+    });
+
+  //  calling Mail function
+  let saas_network = await saasNetworkModel.findOne({ saas_id: saasData._id });
+  message += `<br>
+            Regards<br> ${companyData.name} Team.`;
+  mail.mailSend(
+    user.email,
+    "Transaction Notification from " + companyData.name,
+    message,
+    saasData,
+    saas_network
+  );
+  var username = "Bismart";
+  var password = "Bismart@2021";
+
+  let auths =
+    "Basic " + Buffer.from(username + ":" + password).toString("base64");
+
+  let dateNow = new Date();
+  let timestamp = moment(dateNow).format("YYYYMMDDHHmmss");
+
+  // Britam STK endpoint
+  let URL = "https://api.britam.com/ESB/RS/MpesaPartners/rest/stkPush";
+
+  // request params
+
+  let payment_request = {
+    BusinessShortCode: "827142",
+    Timestamp: timestamp,
+    TransactionType: "CustomerPayBillOnline",
+    Amount: req.body.amount,
+    PartyA: req.body.msisdn,
+    PartyB: "827142",
+    PhoneNumber: req.body.msisdn,
+    CallBackURL: "https://api.bismart.co.ke/api/Payment/britam_callback",
+    AccountReference: "New",
+    TransactionDesc: `payment of ${package.name} from ${companyData.name} by ${user.username} via Bismart`,
+  };
+
+  console.log("Britam's payload -->", payment_request);
+
+  request(
+    {
+      method: "POST",
+      Host: "https://api.britam.com",
+      url: URL,
+      headers: {
+        Authorization: auths,
+      },
+      json: payment_request,
+    },
+    async (error, response, body) => {
+      // callback
+      console.log(body);
+
+      var saas_id = req.body.saas_id;
+      let saas = await SaasModel.findOne({ _id: saas_id });
+      let companyData = await InsuranceCompanyModel.findOne({
+        _id: saas.insurance_comapany_id._id,
+        is_deleted: false,
+      });
+      let package = await saas_product_packageModel.findOne({
+        _id: req.body.package_id,
+      });
+      let user = await UserModel.findOne({ _id: req.body.user_id });
+
+      if (error) {
+        // send Fail message
+        let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} Failed becacuse of ${error.message}`;
+        let sms = {
+          from: companyData.name,
+          receivers: [req.body.msisdn],
+          message,
+        };
+        // Call the send SMS function that will use africa'stalking sms api to send message to user
+        sendSMS(sms)
+          .then((response) => {
+            // message send was successful
+            console.log("SUCCESS:", response.data);
+          })
+          .catch((err) => {
+            // message send failed
+            console.log("FAILED:", err);
+          });
+
+        mail.mailSend(
+          user.email,
+          "Transaction Failuire Notification from " + companyData.name,
+          message,
+          saasData,
+          saas_network
+        );
+        res.send(send_response(null, true, error.message));
+      } else {
+        if (body.errorCode) {
+          //   Send SMS feedback if transaction failed or passed
+          // send Fail message
+          let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} Failed because of ${body.errorMessage}`;
+          let sms = {
+            from: companyData.name,
+            receivers: [req.body.msisdn],
+            message,
+          };
+
+          // Call the send SMS function that will use africa'stalking sms api to send message to user
+          sendSMS(sms)
+            .then((response) => {
+              // message send was successful
+              console.log("SUCCESS:", response);
+            })
+            .catch((err) => {
+              // message send failed
+              console.log("FAILED:", err);
+            });
+          mail.mailSend(
+            user.email,
+            "Transaction Failure Notification from " + companyData.name,
+            message,
+            saasData,
+            saas_network
+          );
+          res.send(send_response(null, true, body.errorMessage));
+        } else {
+          let jsonData = {
+            order_id: req.body.order_id,
+            saas_id: req.body.saas_id,
+            category_id: req.body.category_id,
+            package_id: req.body.package_id,
+            user_id: req.body.user_id,
+            payment_mode: "mpesa",
+            amount: req.body.amount,
+            msisdn: req.body.msisdn,
+            account_reference: req.body.account_reference,
+            transaction_id: body.transaction_id,
+            MerchantRequestID: body.MerchantRequestID,
+            CheckoutRequestID: body.CheckoutRequestID,
+            stkpush_response: body,
+          };
+          let stkData = await paymentModel.create(jsonData);
+
+          console.log("payment record saved");
+          // send success Message
+
+          let message = `Dear, ${user.username}, This is to confirm your purchase of the ${package.name} package from ${companyData.name} was successfull.Total amount billed: ${req.body.amount}. Additional information is available on our account.`;
+
+          // message to user
+          if (stkData.payment_status == "pending") {
+            message = `Dear, ${user.username}, This is to inform you that your payment of the ${package.name} package from ${companyData.name} has been marked pending payment. you can make this payment any time from your account. ${saas_network.domain}/account/myorder`;
+          }
+          let sms = {
+            from: companyData.name,
+            receivers: [req.body.msisdn],
+            message,
+          };
+          sendSMS(sms)
+            .then((response) => {
+              // message send was successful
+              console.log("SUCCESS:");
+            })
+            .catch((err) => {
+              // message send failed
+              console.log("FAILED:", err);
+            });
+          if (stkData.payment_status == "pending") {
+            message += `<br>
+            Regards<br> ${companyData.name} Team.`;
+            mail.mailSend(
+              user.email,
+              "Transaction Notification from " + companyData.name,
+              message,
+              saasData,
+              saas_network
+            );
+          } else if (
+            stkData.payment_status == "complete" ||
+            stkData.payment_status == "processed"
+          ) {
+            message = `
+              Dear ${user.username},<br><br>
+                We have received your payment of Ksh. ${req.body.amount} for the 
+                ${package.name} from ${companyData.name}. Additional information is available in your account<br>
+                If you have any questions concerning your payment, write to us on ${companyData.Email}
+                <br>
+                Regards<br> ${companyData.name} Team.
+            `;
+            mail.mailSend(
+              user.email,
+              "Thank you for your payment" + companyData.name,
+              message,
+              saasData,
+              saas_network
+            );
+          }
+
+          // console.log("MPESA->", response);
+          res.send(send_response(stkData, false, ""));
+        }
+      }
+    }
+  );
+};
+
+exports.britam_callback = async (req, res) => {
+  // call back URL to be hit by Britam once payment request is sent
+  console.log("britam call back hit", req.body);
+  let obj = req.body.Body.stkCallback;
+
+  let paymentData = await paymentModel.findOne({
+    MerchantRequestID: obj.MerchantRequestID,
+  });
+
+  if (paymentData) {
+    if (obj.ResultCode == 0) {
+      message = `Dear, ${paymentData.user_id.username},This is to inform you that your payment was successful! you can access more details about yout transaction from your account dashboard using the reference Merchant Request ID, ${obj.MerchantRequestID}`;
+
+      let sms = {
+        from: "Bismart",
+        receivers: [paymentData.msisdn],
+        message,
+      };
+      sendSMS(sms)
+        .then((response) => {
+          // message send was successful
+          console.log("SUCCESS:", sms);
+        })
+        .catch((err) => {
+          // message send failed
+          console.log("FAILED:", err);
+        });
+
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "success",
+          },
+        }
+      );
+      //mail here
+      console.log("Data found If!");
+    } else {
+      paymentData = await paymentModel.findOne({
+        MerchantRequestID: obj.MerchantRequestID,
+      });
+      message = `Dear, ${paymentData.user_id.username},This is to inform you that your payment failed because ${obj.ResultDesc}, you can access more details about yout transaction from your account dashboard using the reference Merchant Request ID, ${obj.MerchantRequestID}`;
+      let sms = {
+        from: "Bismart",
+        receivers: [paymentData.msisdn],
+        message,
+      };
+      sendSMS(sms)
+        .then((response) => {
+          // message send was successful
+          console.log("SUCCESS:", sms);
+        })
+        .catch((err) => {
+          // message send failed
+          console.log("FAILED:", err);
+        });
+
+      await paymentModel.updateOne(
+        { _id: paymentData._id },
+        {
+          $set: {
+            callback_response: obj,
+            transaction_id: obj.TransactionID,
+            payment_status: "failed",
+          },
+        }
+      );
+      console.log("Data found Else!");
+    }
+  } else {
+    paymentData = await paymentModel.findOne({
+      MerchantRequestID: obj.MerchantRequestID,
+    });
+    await paymentModel.updateOne(
+      { _id: paymentData._id },
+      {
+        $set: {
+          callback_response: obj,
+          transaction_id: obj.TransactionID,
+          payment_status: "failed",
+        },
+      }
+    );
+    console.log("Data not found!");
+  }
+
+  res.send(obj);
+};
+
+exports.nunua = async (req, res) => {
+  console.log(req.body);
+  // destructure relevants
+};
+
+exports.b2c = async (req, res) => {
+  let URL = "https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest";
+  console.log(URL);
+  let auths = req.body.access_token;
+  let saas_mpesa_configurationData = await getsaas_mpesa_configuration(
+    mongoose.Types.ObjectId(req.body.saas_id),
+    ""
+  );
+
+  let SecurityCredential = new Buffer(
+    saas_mpesa_configurationData.shortcode +
+      saas_mpesa_configurationData.password
+  ).toString("base64");
+  //Samcom-2020, Samcom
+  //Dilip-2020, Samcom
+  //AmaniM13, Eunice
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Basic " + auths,
+      },
+      json: {
+        InitiatorName: saas_mpesa_configurationData.initiator_name.toString(),
+        //production
+        SecurityCredential:
+          "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",
+        //sendbox
+        //"SecurityCredential":"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",
+        CommandID: "BusinessPayment",
+        Amount: req.body.amount,
+        PartyA: saas_mpesa_configurationData.shortcode.toString(), // Shortcode
+        PartyB: req.body.msisdn, //Msisdn
+        Remarks: req.body.remarks,
+        ResultURL: config.URL + "/api/Payment/result_url",
+        QueueTimeOutURL: config.URL + "/api/Payment/timeout_url",
+        Occasion: "2020",
+      },
+    },
+    async function (error, response, body) {
+      if (error) {
+        res.send(send_response(null, true, error.message));
+      } else {
+        if (body.errorCode) {
+          res.send(send_response(null, true, body.errorMessage));
+        } else {
+          let jsonData = {
+            order_id: req.body.order_id,
+            saas_id: req.body.saas_id,
+            category_id: req.body.category_id,
+            package_id: req.body.package_id,
+            user_id: req.body.user_id,
+            claim_id: req.body.claim_id,
+            payment_mode: "mpesa",
+            amount: req.body.amount,
+            msisdn: req.body.msisdn,
+            account_reference: req.body.account_reference,
+            transaction_id: body.transaction_id,
+            b2c_response: body,
+            OriginatorConversationID: body.OriginatorConversationID,
+          };
+          let b2cData = await paymentModel.create(jsonData);
+          await claimModel.updateOne(
+            { _id: req.body.claim_id },
+            { $set: { status: "payout" } }
+          );
+          res.send(send_response(b2cData, false, ""));
+        }
+      }
+    }
+  );
+};
+
+exports.b2b = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/b2b/v1/paymentrequest";
+  console.log(URL);
+  let auths = req.body.access_token;
+  //get saas from agent_id
+  let saas_mpesa_configurationData = await getsaas_mpesa_configuration(
+    mongoose.Types.ObjectId(req.body.saas_id),
+    mongoose.Types.ObjectId(req.body.agent_id)
+  );
+  let SecurityCredential = new Buffer(
+    saas_mpesa_configurationData.shortcode +
+      saas_mpesa_configurationData.password
+  ).toString("base64");
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        Initiator: saas_mpesa_configurationData.initiator_name.toString(),
+        //production
+        SecurityCredential:
+          "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",
+        //sendbox
+        //"SecurityCredential":"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",
+        CommandID: "BusinessPayBill",
+        SenderIdentifierType: "4",
+        RecieverIdentifierType: "4",
+        Amount: req.body.amount,
+        PartyA: saas_mpesa_configurationData.shortcode.toString(), // Shortcode:
+        PartyB: saas_mpesa_configurationData.shortcode.toString(), //Lipa Na Mpesa Online Shortcode
+        AccountReference: req.body.account_reference,
+        Remarks: req.body.remarks,
+        ResultURL: config.URL + "/api/Payment/result_url",
+        QueueTimeOutURL: config.URL + "/api/Payment/timeout_url",
+      },
+    },
+    async function (error, response, body) {
+      if (error) {
+        +res.send(send_response(null, true, error.message));
+      } else {
+        if (body.errorCode) {
+          res.send(send_response(null, true, body.errorMessage));
+        } else {
+          let jsonData = {
+            order_id: req.body.order_id,
+            saas_id: req.body.saas_id,
+            category_id: req.body.category_id,
+            package_id: req.body.package_id,
+            user_id: req.body.user_id,
+            account_reference: req.body.account_reference,
+            payment_mode: "mpesa",
+            amount: req.body.amount,
+            msisdn: req.body.msisdn,
+            transaction_id: body.transaction_id,
+            b2b_response: body,
+            OriginatorConversationID: body.OriginatorConversationID,
+          };
+          let b2bData = await paymentModel.create(jsonData);
+          res.send(send_response(b2bData, false, ""));
+        }
+      }
+    }
+  );
+};
+
+exports.reverse = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/reversal/v1/request";
+  console.log(URL);
+  let auths = req.body.access_token;
+
+  let SecurityCredential = new Buffer(
+    req.body.shortcode + "" + credentials.auth.password
+  ).toString("base64");
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        Initiator: req.body.username,
+        SecurityCredential: SecurityCredential,
+        CommandID: "TransactionReversal",
+        TransactionID: req.body.transacion_id,
+        Amount: req.body.amount,
+        ReceiverParty: req.body.receiver_party,
+        RecieverIdentifierType: "4",
+        ResultURL: config.URL + "/api/Payment/result_url",
+        QueueTimeOutURL: config.URL + "/api/Payment/timeout_url",
+        Remarks: req.body.remarks,
+        Occasion: "2020",
+      },
+    },
+    function (error, response, body) {
+      if (error) {
+        console.log(error.message);
+        res.send(error.message);
+      } else {
+        res.send(body);
+      }
+    }
+  );
+};
+
+exports.transactionstatus = async (req, res) => {
+  let URL = "https://api.safaricom.co.ke/mpesa/transactionstatus/v1/query";
+  console.log(URL);
+  let auths = req.body.access_token;
+
+  let SecurityCredential = new Buffer(
+    req.body.shortcode + "" + credentials.auth.password
+  ).toString("base64");
+  request(
+    {
+      method: "POST",
+      url: URL,
+      headers: {
+        Authorization: "Bearer " + auths,
+      },
+      json: {
+        Initiator: req.body.username,
+        SecurityCredential: SecurityCredential,
+        CommandID: "TransactionStatusQuery",
+        TransactionID: req.body.transacion_id,
+        PartyA: req.body.shortcode,
+        IdentifierType: "4",
+        ResultURL: config.URL + "/api/Payment/result_url",
+        QueueTimeOutURL: config.URL + "/api/Payment/timeout_url",
+        Remarks: req.body.remarks,
+        Occasion: "2020",
+      },
+    },
+    function (error, response, body) {
+      if (error) {
+        console.log(error.message);
+        res.send(error.message);
+      } else {
+        res.send(body);
+      }
+    }
+  );
+};
+
+exports.listAllKYC = async (req, res) => {
+  try {
+    let saas_id = mongoose.Types.ObjectId(req.body.saas_id);
+    let category_id = req.body.category_id;
+    let saasData = await SaasModel.findOne({ _id: saas_id, is_deleted: false });
+    //console.log('CHECK ONE..........',saasData);
+    let limit = req.body.limit;
+    let skip = req.body.skip;
+    let OrderWithPayment = [];
+    if (saasData) {
+      let OrderData;
+      let totalOrderData;
+      if (saasData.isMain) {
+        if (category_id != "" && category_id != null) {
+          OrderData = await orderModel
+            .find({ is_deleted: false, category_id: category_id })
+            .sort({ create_date: -1 })
+            .limit(limit)
+            .skip(skip)
+            .limit(2);
+          totalOrderData = await orderModel.countDocuments({
+            is_deleted: false,
+            category_id: category_id,
+          });
+        } else {
+          OrderData = await orderModel
+            .find({ is_deleted: false })
+            .sort({ create_date: -1 })
+            .limit(limit)
+            .skip(skip);
+          totalOrderData = await orderModel.countDocuments({
+            is_deleted: false,
+          });
+        }
+      } else {
+        if (category_id != "" && category_id != null) {
+          OrderData = await orderModel
+            .find({
+              is_deleted: false,
+              saas_id: saas_id,
+              category_id: category_id,
+            })
+            .sort({ create_date: -1 })
+            .limit(limit)
+            .skip(skip);
+          totalOrderData = await orderModel.countDocuments({
+            is_deleted: false,
+            saas_id: saas_id,
+            category_id: category_id,
+          });
+        } else {
+          OrderData = await orderModel
+            .find({ is_deleted: false, saas_id: saas_id })
+            .sort({ create_date: -1 })
+            .limit(limit)
+            .skip(skip);
+          totalOrderData = await orderModel.countDocuments({
+            is_deleted: false,
+            saas_id: saas_id,
+          });
+        }
+      }
+      if (OrderData && OrderData.length > 0) {
+        for (let order_index in OrderData) {
+          let jsonOrder = JSON.parse(JSON.stringify(OrderData[order_index]));
+          let payment_data = await paymentModel.findOne({
+            order_id: OrderData[order_index],
+            category_id: OrderData[order_index].category_id._id,
+            is_deleted: false,
+          });
+          if (payment_data) {
+            jsonOrder.payment_data = payment_data;
+          }
+
+          let health_insurance_kycData = await health_insurance_kycModel.findOne(
+            {
+              order_id: OrderData[order_index],
+              category_id: OrderData[order_index].category_id._id,
+              is_deleted: false,
+            }
+          );
+          if (health_insurance_kycData) {
+            jsonOrder.healthInsuranceData = health_insurance_kycData;
+          }
+
+          let medical_cover_kycData = await medical_cover_kycModel.findOne({
+            order_id: OrderData[order_index],
+            category_id: OrderData[order_index].category_id._id,
+            is_deleted: false,
+          });
+          if (medical_cover_kycData) {
+            jsonOrder.medicalCoverData = medical_cover_kycData;
+          }
+
+          let insurance_kycData = await insurance_kycModel.findOne({
+            order_id: OrderData[order_index],
+            category_id: OrderData[order_index].category_id._id,
+            is_deleted: false,
+          });
+          if (insurance_kycData) {
+            jsonOrder.insuranceData = insurance_kycData;
+          }
+          jsonOrder.productname = "";
+          if (jsonOrder.product_id) {
+            jsonOrder.productname = jsonOrder.product_id.name;
+          }
+          jsonOrder.categoryname = "";
+          if (jsonOrder.category_id) {
+            jsonOrder.categoryname = jsonOrder.category_id.name;
+          }
+          jsonOrder.packagename = "";
+          if (jsonOrder.package_id) {
+            jsonOrder.packagename = jsonOrder.package_id.name;
+          }
+          jsonOrder.company_name = "";
+          if (
+            jsonOrder.package_id &&
+            jsonOrder.package_id.saas_id &&
+            jsonOrder.package_id.saas_id.insurance_comapany_id
+          ) {
+            jsonOrder.company_name =
+              jsonOrder.package_id.saas_id.insurance_comapany_id.name;
+          }
+          OrderWithPayment.push(jsonOrder);
+        }
+
+        if (OrderWithPayment && OrderWithPayment.length > 0) {
+          apiLog.createApiLog(
+            req,
+            send_response(
+              { orders: OrderWithPayment, totalOrder: totalOrderData },
+              false,
+              ""
+            )
+          );
+          res.send(
+            send_response(
+              { orders: OrderWithPayment, totalOrder: totalOrderData },
+              false,
+              ""
+            )
+          );
+        } else {
+          apiLog.createApiLog(req, send_response(null, false, "No data found"));
+          res.send(send_response(null, false, "No data found"));
+        }
+      } else {
+        apiLog.createApiLog(req, send_response(null, false, "Order not found"));
+        res.send(send_response(null, false, "Order not found"));
+      }
+    } else {
+      apiLog.createApiLog(req, send_response(null, false, "Saas not found"));
+      res.send(send_response(null, false, "Saas not found"));
+    }
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.listAllPayments = async (req, res) => {
+  try {
+    let limit = req.body.limit;
+    let skip = req.body.skip;
+    let totalPayments;
+    let paymentData;
+    if (req.body.saas_id) {
+      let saas_id = mongoose.Types.ObjectId(req.body.saas_id);
+      totalPayments = await paymentModel.countDocuments({
+        is_deleted: false,
+        saas_id: saas_id,
+      });
+      paymentData = await paymentModel
+        .find({ is_deleted: false, saas_id: saas_id })
+        .sort({ create_date: -1 })
+        .limit(limit)
+        .skip(skip);
+    } else {
+      totalPayments = await paymentModel.countDocuments({ is_deleted: false });
+      paymentData = await paymentModel
+        .find({ is_deleted: false })
+        .sort({ create_date: -1 })
+        .limit(limit)
+        .skip(skip);
+    }
+    let returnProductData = [];
+    if (totalPayments > 0) {
+      returnProductData = JSON.parse(JSON.stringify(paymentData));
+      for (let index in returnProductData) {
+        if (returnProductData[index].saas_id.insurance_comapany_id) {
+          returnProductData[index].companyName =
+            returnProductData[index].saas_id.insurance_comapany_id.name;
+        } else {
+          returnProductData[index].companyName = "";
+        }
+      }
+    }
+    apiLog.createApiLog(
+      req,
+      send_response(
+        { paymentData: returnProductData, totalPayment: totalPayments },
+        false,
+        ""
+      )
+    );
+    res.send(
+      send_response(
+        { paymentData: returnProductData, totalPayment: totalPayments },
+        false,
+        ""
+      )
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createHomeInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      for (index in req.files) {
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "kraPinDoc") {
+          obj.kraPinDoc = req.files[index]["filename"];
+        }
+      }
+    }
+    let data = await insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.kraPinDoc) {
+        obj.kraPinDoc = data.kraPinDoc;
+      }
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new insurance_kycModel(obj);
+      data = await insurance_kycModel.create(data);
+    }
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let kraPinDoc;
+    if (data.kraPinDoc) {
+      kraPinDoc = config.URL + "/uploads/" + data.kraPinDoc;
+    } else {
+      kraPinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let replace_var = {
+      nameOfProposer: data.nameOfProposer,
+      idNo: data.idNo,
+      idDoc: idDoc, //image
+      telephoneNo: data.telephoneNo,
+      mobileNo: data.mobileNo,
+      email: data.email,
+      kraPinNo: data.kraPinNo,
+      kraPinDoc: kraPinDoc, //image
+      postalAddress: data.postalAddress,
+      physicalAddress: data.physicalAddress,
+      occupation: data.occupation,
+      financialName: data.financialName,
+      buildingInformation: obj.buildingInformation,
+      contents: obj.contents,
+      allRisks: obj.allRisks,
+      wibaDomesticStaff: obj.wibaDomesticStaff,
+    };
+
+    templates.render(
+      templatesDir + "/homeInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          //let options = { format: 'Letter',timeout: '100000' };
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "homeInsurance.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Home", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createTermLifeInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      let birthCertificateIdImage = [];
+      for (index in req.files) {
+        if (req.files[index].fieldname == "birthCertificateId") {
+          birthCertificateIdImage.push(req.files[index]["filename"]);
+        }
+        /* if (req.files[index].fieldname == 'eSignatureId') {
+                    obj.nominee.eSignatureId =  req.files[index]["filename"];
+                }*/
+        if (req.files[index].fieldname == "copyOfId") {
+          obj.attachDocuments.copyOfId = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "pinCertificateId") {
+          obj.attachDocuments.pinCertificateId = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "nomineeId") {
+          obj.attachDocuments.nomineeId = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "kraPinDoc") {
+          obj.kraPinDoc = req.files[index]["filename"];
+        }
+      }
+      for (let i in birthCertificateIdImage) {
+        obj.beneficiaryNomination[i].birthCertificateId =
+          birthCertificateIdImage[i];
+      }
+    }
+
+    let data = await insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      obj.nominee.dateOfBirth = data.nominee.dateOfBirth;
+      obj.isPreviouslyHeldAccidentPolicy = data.isPreviouslyHeldAccidentPolicy;
+      obj.areYouInGoodHealth = data.areYouInGoodHealth;
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.kraPinDoc) {
+        obj.kraPinDoc = data.kraPinDoc;
+      }
+      if (!obj.attachDocuments.pinCertificateId) {
+        obj.attachDocuments.pinCertificateId =
+          data.attachDocuments.pinCertificateId;
+      }
+      if (!obj.attachDocuments.copyOfId) {
+        obj.attachDocuments.copyOfId = data.attachDocuments.copyOfId;
+      }
+      if (!obj.attachDocuments.nomineeId) {
+        obj.attachDocuments.nomineeId = data.attachDocuments.nomineeId;
+      }
+
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new insurance_kycModel(obj);
+      data = await insurance_kycModel.create(data);
+    }
+
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+
+    let kraPinDoc;
+    if (data.kraPinDoc) {
+      kraPinDoc = config.URL + "/uploads/" + data.kraPinDoc;
+    } else {
+      kraPinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+
+    let beneficiaryNomination = data.beneficiaryNomination;
+    for (let i in beneficiaryNomination) {
+      if (beneficiaryNomination[i].birthCertificateId) {
+        beneficiaryNomination[i].birthCertificateId =
+          config.URL +
+          "/uploads/" +
+          beneficiaryNomination[i].birthCertificateId;
+      } else {
+        beneficiaryNomination[i].birthCertificateId =
+          config.URL + "/uploads/noImage.jpg";
+      }
+      beneficiaryNomination[i].dateOfBirth = moment(
+        beneficiaryNomination[i].dateOfBirth
+      ).format("MM-DD-YYYY");
+    }
+
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+
+    let nomineeDateOfBirth = moment(data.nominee.dateOfBirth).format(
+      "MM-DD-YYYY"
+    );
+
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let replace_var = {
+      applicantName: data.applicantName,
+      nationality: data.nationality,
+      idNo: data.idNo,
+      idDoc: idDoc, //image
+      mobileNo: data.mobileNo,
+      email: data.email,
+      kraPinNo: data.kraPinNo,
+      kraPinDoc: kraPinDoc, //image
+      postalAddress: data.postalAddress,
+      postalCode: data.postalCode,
+      dateOfBirth: dateOfBirth,
+      occupation: data.occupation,
+      schoolName: data.schoolName,
+      sumAssured: data.sumAssured,
+      declarationOfGoodHealth: data.declarationOfGoodHealth,
+      beneficiaryNomination: beneficiaryNomination,
+      residentialAddress: data.residentialAddress,
+      fullName: data.nominee.fullName,
+      relationShip: data.nominee.relationShip,
+      nomineeDateOfBirth: nomineeDateOfBirth,
+      //    eSignatureId:config.URL+'/uploads/'+data.nominee.eSignatureId, //image
+      copyOfId: config.URL + "/uploads/" + data.attachDocuments.copyOfId, //image
+      pinCertificateId:
+        config.URL + "/uploads/" + data.attachDocuments.pinCertificateId, //image
+      nomineeId: config.URL + "/uploads/" + data.attachDocuments.nomineeId, //image
+    };
+
+    templates.render(
+      templatesDir + "/termLifeInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "termLifeInsuranceKyc.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Term Life", filename);
+              }
+            });
+        }
+        // send mail with defined transport object
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createMotorInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    obj.nominee.dateOfBirth = new Date();
+    if (req.files) {
+      for (index in req.files) {
+        if (req.files[index].fieldname == "ncdDocId") {
+          obj.ncdDocId = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "copyOfId") {
+          obj.documentsCopy.copyOfId = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "logBook") {
+          obj.documentsCopy.logBook = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "copyOfPin") {
+          obj.documentsCopy.copyOfPin = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "validDrivingLic") {
+          obj.documentsCopy.validDrivingLic = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "regCerti") {
+          obj.documentsCopy.regCerti = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "kraPinDoc") {
+          obj.kraPinDoc = req.files[index]["filename"];
+        }
+      }
+    }
+    let data = await insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      obj.dateOfBirth = data.dateOfBirth;
+      obj.isPreviouslyHeldAccidentPolicy = data.isPreviouslyHeldAccidentPolicy;
+      obj.areYouInGoodHealth = data.areYouInGoodHealth;
+      obj.nominee.dateOfBirth = data.nominee.dateOfBirth;
+      if (!obj.ncdDocId) {
+        obj.ncdDocId = data.ncdDocId;
+      }
+      if (!obj.documentsCopy.copyOfId) {
+        obj.documentsCopy.copyOfId = data.documentsCopy.copyOfId;
+      }
+      if (!obj.documentsCopy.logBook) {
+        obj.documentsCopy.logBook = data.documentsCopy.logBook;
+      }
+      if (!obj.documentsCopy.copyOfPin) {
+        obj.documentsCopy.copyOfPin = data.documentsCopy.copyOfPin;
+      }
+      if (!obj.documentsCopy.validDrivingLic) {
+        obj.documentsCopy.validDrivingLic = data.documentsCopy.validDrivingLic;
+      }
+      if (!obj.documentsCopy.regCerti) {
+        obj.documentsCopy.regCerti = data.documentsCopy.regCerti;
+      }
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.kraPinDoc) {
+        obj.kraPinDoc = data.kraPinDoc;
+      }
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new insurance_kycModel(obj);
+      data = await insurance_kycModel.create(data);
+    }
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    //if getting true print 'Yes', else 'No'
+    let isNCD = "No";
+    if (data.isNCD) {
+      isNCD = "Yes";
+    }
+    let declinedProposal = "No";
+    if (data.hasAnyInsCmp.declinedProposal) {
+      declinedProposal = "Yes";
+    }
+    let refusedPolicy = "No";
+    if (data.hasAnyInsCmp.refusedPolicy) {
+      refusedPolicy = "Yes";
+    }
+    let increasePremium = "No";
+    if (data.hasAnyInsCmp.increasePremium) {
+      increasePremium = "Yes";
+    }
+    let isVehicleYour = "No";
+    if (data.isVehicleYour) {
+      isVehicleYour = "Yes";
+    }
+
+    let socialDomestic = "No";
+    if (data.vehicleUsedFor.socialDomestic) {
+      socialDomestic = "Yes";
+    }
+    let passengers = "No";
+    if (data.vehicleUsedFor.passengers) {
+      passengers = "Yes";
+    }
+    let business = "No";
+    if (data.vehicleUsedFor.business) {
+      business = "Yes";
+    }
+    let extraDetailsOfUse = "No";
+    if (data.vehicleUsedFor.extraDetailsOfUse) {
+      extraDetailsOfUse = "Yes";
+    }
+    let drivenByOther = "No";
+    if (data.drivenByOther) {
+      drivenByOther = "Yes";
+    }
+    let isAntiTheft = "No";
+    if (data.isAntiTheft) {
+      isAntiTheft = "Yes";
+    }
+    let kraPinDoc;
+    if (data.kraPinDoc) {
+      kraPinDoc = config.URL + "/uploads/" + data.kraPinDoc;
+    } else {
+      kraPinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let ncdDocId;
+    if (data.ncdDocId) {
+      ncdDocId = config.URL + "/uploads/" + data.ncdDocId;
+    } else {
+      ncdDocId = config.URL + "/uploads/noImage.jpg";
+    }
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+
+    let validDrivingLic;
+    if (data.documentsCopy.validDrivingLic) {
+      validDrivingLic =
+        config.URL + "/uploads/" + data.documentsCopy.validDrivingLic;
+    } else {
+      validDrivingLic = config.URL + "/uploads/noImage.jpg";
+    }
+    let regCerti;
+    if (data.documentsCopy.regCerti) {
+      regCerti = config.URL + "/uploads/" + data.documentsCopy.regCerti;
+    } else {
+      regCerti = config.URL + "/uploads/noImage.jpg";
+    }
+    let copyOfId;
+    if (data.documentsCopy.copyOfId) {
+      copyOfId = config.URL + "/uploads/" + data.documentsCopy.copyOfId;
+    } else {
+      copyOfId = config.URL + "/uploads/noImage.jpg";
+    }
+    let logBook;
+    if (data.documentsCopy.logBook) {
+      logBook = config.URL + "/uploads/" + data.documentsCopy.logBook;
+    } else {
+      logBook = config.URL + "/uploads/noImage.jpg";
+    }
+    let copyOfPin;
+    if (data.documentsCopy.copyOfPin) {
+      copyOfPin = config.URL + "/uploads/" + data.documentsCopy.copyOfPin;
+    } else {
+      copyOfPin = config.URL + "/uploads/noImage.jpg";
+    }
+
+    let replace_var = {
+      agencyBrokerCode: data.agencyBrokerCode,
+      customerCorporateName: data.customerCorporateName,
+      idNo: data.idNo,
+      idDoc: idDoc, //image
+      mobileNo: data.mobileNo,
+      email: data.email,
+      kraPinNo: data.kraPinNo,
+      kraPinDoc: kraPinDoc, //image
+      postalAddress: data.postalAddress,
+      occupation: data.occupation,
+      dateOfBirth: dateOfBirth,
+      financierName: data.financierName,
+      drivingLicNo: data.drivingLicNo,
+      drivingExp: data.drivingExp,
+      accidentLosses: data.accidentLosses,
+      isNCD: isNCD,
+      ncdDocId: ncdDocId, //image
+
+      declinedProposal: declinedProposal,
+      refusedPolicy: refusedPolicy,
+      increasePremium: increasePremium,
+      extraDetails: data.hasAnyInsCmp.extraDetails,
+
+      isVehicleYour: isVehicleYour,
+      vehicleExtraDetails: data.vehicleExtraDetails,
+      previousInsurer: data.previousInsurer,
+      policyNumber: data.policyNumber,
+
+      socialDomestic: socialDomestic,
+      passengers: passengers,
+      business: business,
+      extraDetailsOfUse: data.vehicleUsedFor.extraDetailsOfUse,
+
+      drivenByOther: drivenByOther,
+      otherDriverInfo: data.otherDriverInfo,
+      isAntiTheft: isAntiTheft,
+
+      copyOfId: copyOfId, //image
+      logBook: logBook, //image
+      copyOfPin: copyOfPin, //image
+      validDrivingLic: validDrivingLic, //image
+      regCerti: regCerti, //image
+    };
+
+    templates.render(
+      templatesDir + "/motorInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "motorInsuranceKyc.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Motor", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createHealthInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      let photograph = [];
+      for (index in req.files) {
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "pinDoc") {
+          obj.pinDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "memberSignature") {
+          obj.signatures.memberSignature = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "spouseSignature") {
+          obj.signatures.spouseSignature = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "signatureOfIntermediary") {
+          obj.intermediaryDetails.signatureOfIntermediary =
+            req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "photograph") {
+          photograph.push(req.files[index]["filename"]);
+        }
+      }
+      for (let i in photograph) {
+        obj.dependant[i].photograph = photograph[i];
+      }
+    }
+    obj.confidentialMedicalHistory.applicantsHealthData[0].bloodDisorders =
+      "Blood disorders. e.g. anemia, bleeding disorders, leukemia";
+    obj.confidentialMedicalHistory.applicantsHealthData[1].cancer =
+      "Cancer, growths or tumors whether benign or malignant";
+    obj.confidentialMedicalHistory.applicantsHealthData[2].cardiovascular =
+      "Cardiovascular (heart and blood vessels) disorders e.g. high blood pressure, varicose veins, palpitations, deep vein thrombosis";
+    obj.confidentialMedicalHistory.applicantsHealthData[3].earNoseDisorders =
+      "Ear, nose and throat disorders e.g. hearing/speech impairment, ear infections, sinus problems, nasal/throat surgery, tonsils, adenoids, previous nasal injuries, upper airway infections, epistaxis";
+    obj.confidentialMedicalHistory.applicantsHealthData[4].endocrinedisorders =
+      "Endocrine disorders e.g. diabetes, high cholesterol , thyroid abnormalities";
+    obj.confidentialMedicalHistory.applicantsHealthData[5].eyeRelatedDisorders =
+      "Eye related disorders e.g. blindness, glaucoma, eye surgery, , cataracts, lens implants, refractive and laser surgery";
+    obj.confidentialMedicalHistory.applicantsHealthData[6].genitoUrinary =
+      "Genito-urinary system e.g. Pelvic inflammatory disease prostate problem, abnormalities of the penis, scrotum. Reproductive system, blood in the urine, kidney stones, kidney failure, bladder problems, Dialysis";
+    obj.confidentialMedicalHistory.applicantsHealthData[7].gastroIntestinal =
+      "Gastro-intestinal disorders e.g. recurrent indigestion, heartburn, ulcers, hernia, piles, fissures. Have you ever had any endoscopic study of the oesophagus, stomach or colon?";
+    obj.confidentialMedicalHistory.applicantsHealthData[8].gynecologicalAndObstetrical =
+      "Gynecological and obstetrical disorders e.g. Fibroids, ectopic pregnancy, caesarian section, Menstrual irregularities. Abnormal pap smear, receiving hormone treatment. Uterine bleeding, Laparoscopic surgery, Dilatation and curettage, miscarriages, pregnancy related problems. Pregnant, if positive, provide expected date of delivery (dd/mm/yy)";
+    obj.confidentialMedicalHistory.applicantsHealthData[9].musculoSkeletal =
+      "Musculo-skeletal disorders e.g. arthritis, Back problems, gout, osteoporosis. All joint problems and fractures";
+    obj.confidentialMedicalHistory.applicantsHealthData[10].neurologicalDisorders =
+      "Neurological disorders e.g. epilepsy, Stroke. Brain or spinal cord disorders, Headache, migraine, Paralysis, meningitis";
+    obj.confidentialMedicalHistory.applicantsHealthData[11].psychologicalDisorders =
+      "Psychological disorders e.g. alcohol or drug dependency, anxiety disorder, insomnia, depression, stress, attention deficit disorder, post traumatic stress, attempted suicide,";
+    obj.confidentialMedicalHistory.applicantsHealthData[12].respiratoryDisorders =
+      "Respiratory disorders e.g. asthma, rhinitis, chronic bronchitis, cigarette smoking related disorders, tuberculosis, persistent cough, allergies, chronic obstruction pulmonary disease, shortness of breath.";
+    obj.confidentialMedicalHistory.applicantsHealthData[13].skinDisorders =
+      "Skin disorders e.g. eczema, melanoma, skin cancer, burns, scars, keloids, warts";
+    obj.confidentialMedicalHistory.applicantsHealthData[14].stateWhether =
+      "State whether you or any of your dependants have received medical advice or treatment for any tropical disease e.g. leprosy, sleeping sickness, elephantiasis, bilharzia, yellow fever";
+    obj.confidentialMedicalHistory.applicantsHealthData[15].sexualTransmitted =
+      "Have you or any of your dependants ever sought counseling or treatment in connection with sexual transmitted infection e.g. gonorrhoea, syphilis, herpes simplex, Chlamydia";
+    obj.confidentialMedicalHistory.applicantsHealthData[16].HivAids =
+      "Have you or any of your dependants ever sought counseling or treatment in connection with HIV or AIDS infections or tested positive for HIV or AIDS?";
+    obj.confidentialMedicalHistory.applicantsHealthData[17].hereditary =
+      "Do you or any of your dependants have any hereditary disorders, birth defects or congenital conditions?";
+    obj.confidentialMedicalHistory.applicantsHealthData[18].dentalTreatment =
+      "Do you or any of your dependants have incomplete dental treatment plan, dental implants, orthodontic treatment, dentures, and wisdom teeth problems or do you or any of your dependants currently receive, or expect to receive dental treatment in the next 12 months?";
+    obj.confidentialMedicalHistory.applicantsHealthData[19].specializedTreatment =
+      "Investigations and/or specialized treatment: In and out of hospital a) Are you or any of your dependants currently undergoing or expect to undergo investigations for any medical condition and / or symptoms not yet diagnosed? b) Are you or any of your dependants currently receiving, or expect to receive specialized treatment (i.e. chemotherapy, radiotherapy, bone marrow transplant, mechanical ventilation, oxygen therapy, dialysis, psychotherapy or counseling?";
+    obj.confidentialMedicalHistory.applicantsHealthData[20].medication =
+      "Are you or any of your dependants on any medication (please indicate in the table provided below)";
+
+    let data = await health_insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.pinDoc) {
+        obj.pinDoc = data.pinDoc;
+      }
+      if (!obj.signatures.memberSignature) {
+        obj.signatures.memberSignature = data.signatures.memberSignature;
+      }
+      if (!obj.signatures.spouseSignature) {
+        obj.signatures.spouseSignature = data.signatures.spouseSignature;
+      }
+      if (!obj.intermediaryDetails.signatureOfIntermediary) {
+        obj.intermediaryDetails.signatureOfIntermediary =
+          data.intermediaryDetails.signatureOfIntermediary;
+      }
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new health_insurance_kycModel(obj);
+      data = await health_insurance_kycModel.create(data);
+    }
+
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let applicantsHealthData =
+      obj.confidentialMedicalHistory.applicantsHealthData;
+
+    //Blood disorders
+    let questionNo1,
+      questionNo2,
+      questionNo3,
+      questionNo4,
+      questionNo5,
+      questionNo6,
+      questionNo7,
+      questionNo8,
+      questionNo9,
+      questionNo10,
+      questionNo11,
+      questionNo12,
+      questionNo13,
+      questionNo14,
+      questionNo15,
+      questionNo16,
+      questionNo17,
+      questionNo18,
+      questionNo19,
+      questionNo20,
+      questionNo21;
+    let dependantHealthStatus;
+
+    questionNo1 = applicantsHealthData[0].questionNo;
+    questionNo2 = applicantsHealthData[1].questionNo;
+    questionNo3 = applicantsHealthData[2].questionNo;
+    questionNo4 = applicantsHealthData[3].questionNo;
+    questionNo5 = applicantsHealthData[4].questionNo;
+    questionNo6 = applicantsHealthData[5].questionNo;
+    questionNo7 = applicantsHealthData[6].questionNo;
+    questionNo8 = applicantsHealthData[7].questionNo;
+    questionNo9 = applicantsHealthData[8].questionNo;
+    questionNo10 = applicantsHealthData[9].questionNo;
+    questionNo11 = applicantsHealthData[10].questionNo;
+    questionNo12 = applicantsHealthData[11].questionNo;
+    questionNo13 = applicantsHealthData[12].questionNo;
+    questionNo14 = applicantsHealthData[13].questionNo;
+    questionNo15 = applicantsHealthData[14].questionNo;
+    questionNo16 = applicantsHealthData[15].questionNo;
+    questionNo17 = applicantsHealthData[16].questionNo;
+    questionNo18 = applicantsHealthData[17].questionNo;
+    questionNo19 = applicantsHealthData[18].questionNo;
+    questionNo20 = applicantsHealthData[19].questionNo;
+    questionNo21 = applicantsHealthData[20].questionNo;
+
+    let dependantStatus = [];
+    for (let i = 1; i <= data.dependant.length; i++) {
+      dependantStatus.push("No " + i);
+    }
+
+    let checkStatus = [];
+    let allcheckStatus = [];
+    for (let j = 0; j < 21; j++) {
+      checkStatus = [];
+      dependantHealthStatus = applicantsHealthData[j].dependantHealthStatus;
+      for (let i = 0; i < dependantHealthStatus.length; i++) {
+        if (dependantHealthStatus[i]["checkbox" + (j + 1)]) {
+          checkStatus[i] = "Yes";
+        } else {
+          checkStatus[i] = "No";
+        }
+      }
+      allcheckStatus.push(checkStatus);
+    }
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+    let fromDate = moment(data.previousMembership.fromDate).format(
+      "MM-DD-YYYY"
+    );
+    let toDate = moment(data.previousMembership.toDate).format("MM-DD-YYYY");
+    let spouseFromDate = moment(data.previousMembership.spouseFromDate).format(
+      "MM-DD-YYYY"
+    );
+    let spouseToDate = moment(data.previousMembership.spouseToDate).format(
+      "MM-DD-YYYY"
+    );
+    let signatureDate = moment(data.signatures.signatureDate).format(
+      "MM-DD-YYYY"
+    );
+    let intermediaryDate = moment(data.intermediaryDetails.date).format(
+      "MM-DD-YYYY"
+    );
+    let policyCommencementDate = moment(data.policyCommencement.date).format(
+      "MM-DD-YYYY"
+    );
+
+    let dependant = obj.dependant;
+    for (let i in dependant) {
+      if (dependant[i].photograph) {
+        dependant[i].photograph =
+          config.URL + "/uploads/" + dependant[i].photograph;
+      } else {
+        dependant[i].photograph = config.URL + "/uploads/noImage.jpg";
+      }
+      dependant[i].dateOfBirth = moment(dependant[i].dateOfBirth).format(
+        "MM-DD-YYYY"
+      );
+    }
+
+    let medicationExtraDetails =
+      obj.confidentialMedicalHistory.medicationExtraDetails;
+    for (let i in medicationExtraDetails) {
+      medicationExtraDetails[i].startDate = moment(
+        medicationExtraDetails[i].startDate
+      ).format("MM-DD-YYYY");
+    }
+
+    let medicalHistoryExtraDetails =
+      obj.confidentialMedicalHistory.medicalHistoryExtraDetails;
+    for (let i in medicalHistoryExtraDetails) {
+      medicalHistoryExtraDetails[i].date = moment(
+        medicalHistoryExtraDetails[i].date
+      ).format("MM-DD-YYYY");
+    }
+
+    let surgeryAndHospitalAdmissions = obj.surgeryAndHospitalAdmissions;
+    for (let i in surgeryAndHospitalAdmissions) {
+      surgeryAndHospitalAdmissions[i].date = moment(
+        surgeryAndHospitalAdmissions[i].date
+      ).format("MM-DD-YYYY");
+    }
+    let pinDoc;
+    if (data.pinDoc) {
+      pinDoc = config.URL + "/uploads/" + data.pinDoc;
+    } else {
+      pinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let memberSignature;
+    if (data.signatures.memberSignature) {
+      memberSignature =
+        config.URL + "/uploads/" + data.signatures.memberSignature;
+    } else {
+      memberSignature = config.URL + "/uploads/noImage.jpg";
+    }
+    let spouseSignature;
+    if (data.signatures.spouseSignature) {
+      spouseSignature =
+        config.URL + "/uploads/" + data.signatures.spouseSignature;
+    } else {
+      spouseSignature = config.URL + "/uploads/noImage.jpg";
+    }
+    let signatureOfIntermediary;
+    if (data.intermediaryDetails.signatureOfIntermediary) {
+      signatureOfIntermediary =
+        config.URL +
+        "/uploads/" +
+        data.intermediaryDetails.signatureOfIntermediary;
+    } else {
+      signatureOfIntermediary = config.URL + "/uploads/noImage.jpg";
+    }
+
+    let replace_var = {
+      firstName: data.firstName,
+      surname: data.surname,
+      otherName: data.otherName,
+      gender: data.gender,
+      idNo: data.idNo,
+      idDoc: idDoc, //image
+      kraPinNo: data.pinNo,
+      kraPinDoc: pinDoc, //image
+      dateOfBirth: dateOfBirth,
+      maritialStatus: data.maritialStatus,
+      height: data.height,
+      weight: data.weight,
+      nameOfEmployer: data.nameOfEmployer,
+      occupation: data.occupation,
+      nationality: data.nationality,
+
+      postalAddress: data.contactInformation.postalAddress,
+      physicalHomeAddress: data.contactInformation.physicalHomeAddress,
+      officeTelephone: data.contactInformation.officeTelephone,
+      mobileNo: data.contactInformation.mobileNo,
+      homeTelephone: data.contactInformation.homeTelephone,
+      email: data.contactInformation.email,
+
+      kinFullName: data.nextOfKin.fullName,
+      kinRelationShip: data.nextOfKin.relationShip,
+      kinIdNo: data.nextOfKin.idNo,
+      kinTelephoneNo: data.nextOfKin.telephoneNo,
+      KinPostalAddress: data.nextOfKin.postalAddress,
+
+      beneficiaryFullName: data.beneficiaryOfPersonalAcc.fullName,
+      beneficiaryRelationShip: data.beneficiaryOfPersonalAcc.relationShip,
+      beneficiaryIdNo: data.beneficiaryOfPersonalAcc.idNo,
+      beneficiaryTelephoneNo: data.beneficiaryOfPersonalAcc.telephoneNo,
+      beneficiaryPostalAddress: data.beneficiaryOfPersonalAcc.postalAddress,
+
+      dependant: dependant,
+
+      principalName: data.previousMembership.principalName,
+      fromDate: fromDate,
+      toDate: toDate,
+      spouseName: data.previousMembership.spouseName,
+      spouseFromDate: spouseFromDate,
+      spouseToDate: spouseToDate,
+      isDeclined: data.previousMembership.isDeclined,
+      declinedExtraInfo: data.previousMembership.declinedExtraInfo,
+      isLodgedClaim: data.previousMembership.isLodgedClaim,
+      lodgedClaimExtraDetails: data.previousMembership.lodgedClaimExtraDetails,
+
+      questionNo1: questionNo1,
+      questionNo2: questionNo2,
+      questionNo3: questionNo3,
+      questionNo4: questionNo4,
+      questionNo5: questionNo5,
+      questionNo6: questionNo6,
+      questionNo7: questionNo7,
+      questionNo8: questionNo8,
+      questionNo9: questionNo9,
+      questionNo10: questionNo10,
+      questionNo11: questionNo11,
+      questionNo12: questionNo12,
+      questionNo13: questionNo13,
+      questionNo14: questionNo14,
+      questionNo15: questionNo15,
+      questionNo16: questionNo16,
+      questionNo17: questionNo17,
+      questionNo18: questionNo18,
+      questionNo19: questionNo19,
+      questionNo20: questionNo20,
+      questionNo21: questionNo21,
+
+      checkStatus1: allcheckStatus[0],
+      checkStatus2: allcheckStatus[1],
+      checkStatus3: allcheckStatus[2],
+      checkStatus4: allcheckStatus[3],
+      checkStatus5: allcheckStatus[4],
+      checkStatus6: allcheckStatus[5],
+      checkStatus7: allcheckStatus[6],
+      checkStatus8: allcheckStatus[7],
+      checkStatus9: allcheckStatus[8],
+      checkStatus10: allcheckStatus[9],
+      checkStatus11: allcheckStatus[10],
+      checkStatus12: allcheckStatus[11],
+      checkStatus13: allcheckStatus[12],
+      checkStatus14: allcheckStatus[13],
+      checkStatus15: allcheckStatus[14],
+      checkStatus16: allcheckStatus[15],
+      checkStatus17: allcheckStatus[16],
+      checkStatus18: allcheckStatus[17],
+      checkStatus19: allcheckStatus[18],
+      checkStatus20: allcheckStatus[19],
+      checkStatus21: allcheckStatus[20],
+
+      dependantStatus: dependantStatus,
+
+      bloodDisorders: applicantsHealthData[0].bloodDisorders,
+      cancer: applicantsHealthData[1].cancer,
+      cardiovascular: applicantsHealthData[2].cardiovascular,
+      earNoseDisorders: applicantsHealthData[3].earNoseDisorders,
+      endocrinedisorders: applicantsHealthData[4].endocrinedisorders,
+      eyeRelatedDisorders: applicantsHealthData[5].eyeRelatedDisorders,
+      genitoUrinary: applicantsHealthData[6].genitoUrinary,
+      gastroIntestinal: applicantsHealthData[7].gastroIntestinal,
+      gynecologicalAndObstetrical:
+        applicantsHealthData[8].gynecologicalAndObstetrical,
+      musculoSkeletal: applicantsHealthData[9].musculoSkeletal,
+      neurologicalDisorders: applicantsHealthData[10].neurologicalDisorders,
+      psychologicalDisorders: applicantsHealthData[11].psychologicalDisorders,
+      respiratoryDisorders: applicantsHealthData[12].respiratoryDisorders,
+      skinDisorders: applicantsHealthData[13].skinDisorders,
+      stateWhether: applicantsHealthData[14].stateWhether,
+      sexualTransmitted: applicantsHealthData[15].sexualTransmitted,
+      HivAids: applicantsHealthData[16].HivAids,
+      hereditary: applicantsHealthData[17].hereditary,
+      dentalTreatment: applicantsHealthData[18].dentalTreatment,
+      specializedTreatment: applicantsHealthData[19].specializedTreatment,
+      medication: applicantsHealthData[20].medication,
+
+      medicationExtraDetails: medicationExtraDetails,
+      medicalHistoryExtraDetails: medicalHistoryExtraDetails,
+      surgeryAndHospitalAdmissions: surgeryAndHospitalAdmissions,
+
+      memberSignature: memberSignature, //image
+      spouseSignature: spouseSignature, //image
+      signatureDate: signatureDate,
+
+      intermediaryFullName: data.intermediaryDetails.fullName,
+      intermediaryTradingUs: data.intermediaryDetails.tradingUs,
+      intermediaryTelephoneNo: data.intermediaryDetails.telephoneNo,
+      intermediaryPinNo: data.intermediaryDetails.pinNo,
+      intermediaryEmail: data.intermediaryDetails.email,
+      intermediarySignatureOfIntermediary: signatureOfIntermediary, //image
+      intermediaryDate: intermediaryDate,
+      intermediaryUnitManagerName: data.intermediaryDetails.unitManagerName,
+      intermediaryBdmName: data.intermediaryDetails.bdmName,
+
+      policyCommencementDate: policyCommencementDate,
+    };
+
+    templates.render(
+      templatesDir + "/healthInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "healthInsurance.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Health", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createAccidentInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      let birthCertificate = [];
+      for (index in req.files) {
+        if (req.files[index].fieldname == "birthCertificate") {
+          birthCertificate.push(req.files[index]["filename"]);
+        }
+        if (req.files[index].fieldname == "kraPinDoc") {
+          obj.kraPinDoc = req.files[index]["filename"];
+        }
+      }
+      for (let i in birthCertificate) {
+        obj.children[i].birthCertificate = birthCertificate[i];
+      }
+    }
+    let data = await insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      if (!obj.kraPinDoc) {
+        obj.kraPinDoc = data.kraPinDoc;
+      }
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new insurance_kycModel(obj);
+      data = await insurance_kycModel.create(data);
+    }
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+    let coverTo = moment(data.coverTo).format("MM-DD-YYYY");
+    let coverFrom = moment(data.coverFrom).format("MM-DD-YYYY");
+    let children = obj.children;
+    for (let i in children) {
+      if (!children[i].birthCertificate) {
+        children[i].birthCertificate = "noImage.jpg";
+      }
+      if (children[i].dateOfBirth) {
+        children[i].dateOfBirth = moment(children[i].dateOfBirth).format(
+          "MM-DD-YYYY"
+        );
+      } else {
+        children[i].dateOfBirth = moment(new Date()).format("MM-DD-YYYY");
+      }
+    }
+    let kraPinDoc;
+    if (data.kraPinDoc) {
+      kraPinDoc = config.URL + "/uploads/" + data.kraPinDoc;
+    } else {
+      kraPinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let replace_var = {
+      nameOfProposer: data.nameOfProposer,
+      telephoneNo: data.telephoneNo,
+      mobileNo: data.mobileNo,
+      occupation: data.occupation,
+      kraPinNo: data.kraPinNo,
+      kraPinDoc: kraPinDoc, //image
+      postalAddress: data.postalAddress,
+      coverFrom: coverFrom,
+      coverTo: coverTo,
+      dateOfBirth: dateOfBirth,
+      nameOfPreviousInsurer: data.nameOfPreviousInsurer,
+      isPreviouslyHeldAccidentPolicy: data.isPreviouslyHeldAccidentPolicy,
+      selectedCoverOption: data.selectedCoverOption,
+      premium: data.premium,
+
+      children: children, //array
+      beneficiary: obj.beneficiary, //array
+
+      areYouInGoodHealth: data.areYouInGoodHealth,
+      goodHealthExtraDetail: data.goodHealthExtraDetail,
+
+      spouseDetailsName: data.spouseDetails.name,
+      spouseDetailsIdNo: data.spouseDetails.idNo,
+      spouseDetailsMobileNo: data.spouseDetails.mobileNo,
+      spouseDetailsRelationShip: data.spouseDetails.relationShip,
+      spouseDetailsAddress: data.spouseDetails.address,
+      spouseDetailsPostalCode: data.spouseDetails.postalCode,
+      spouseDetailsTown: data.spouseDetails.town,
+    };
+
+    templates.render(
+      templatesDir + "/accidentInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "accidentInsurance.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Home", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createFuneralInsuranceKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      let birthCertificate = [];
+      for (index in req.files) {
+        if (req.files[index].fieldname == "birthCertificate") {
+          birthCertificate.push(req.files[index]["filename"]);
+        }
+        if (req.files[index].fieldname == "kraPinDoc") {
+          obj.kraPinDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+      }
+      for (let i in birthCertificate) {
+        obj.insurerDetails[i].birthCertificate = birthCertificate[i];
+      }
+    }
+    let data = await insurance_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.kraPinDoc) {
+        obj.kraPinDoc = data.kraPinDoc;
+      }
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new insurance_kycModel(obj);
+      data = await insurance_kycModel.create(data);
+    }
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+    let coverTo = moment(data.coverTo).format("MM-DD-YYYY");
+    let coverFrom = moment(data.coverFrom).format("MM-DD-YYYY");
+    let insurerDetails = obj.insurerDetails;
+    for (let i in insurerDetails) {
+      if (insurerDetails[i].birthCertificate) {
+        insurerDetails[i].birthCertificate =
+          config.URL + "/uploads/" + insurerDetails[i].birthCertificate;
+      } else {
+        insurerDetails[i].birthCertificate =
+          config.URL + "/uploads/noImage.jpg";
+      }
+      insurerDetails[i].dateOfBirth = moment(
+        insurerDetails[i].dateOfBirth
+      ).format("MM-DD-YYYY");
+    }
+    let kraPinDoc;
+    if (data.kraPinDoc) {
+      kraPinDoc = config.URL + "/uploads/" + data.kraPinDoc;
+    } else {
+      kraPinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let replace_var = {
+      nameOfProposer: data.nameOfProposer,
+      dateOfBirth: dateOfBirth,
+      telephoneNo: data.telephoneNo,
+      mobileNo: data.mobileNo,
+      occupation: data.occupation,
+      kraPinNo: data.kraPinNo,
+      kraPinDoc: kraPinDoc, //image
+      idNo: data.idNo,
+      idDoc: idDoc, //image
+      postalAddress: data.postalAddress,
+      coverFrom: coverFrom,
+      coverTo: coverTo,
+      beneficiary: obj.beneficiary, //array
+      insurerDetails: insurerDetails, //array
+    };
+
+    templates.render(
+      templatesDir + "/funeralInsuranceKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "funeralInsurance.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Home", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.createMedicalCoverKYC = async (req, res) => {
+  try {
+    let obj = JSON.parse(req.body.data);
+    if (req.files) {
+      //let photograph = [];
+      for (index in req.files) {
+        if (req.files[index].fieldname == "idDoc") {
+          obj.idDoc = req.files[index]["filename"];
+        }
+        if (req.files[index].fieldname == "pinDoc") {
+          obj.pinDoc = req.files[index]["filename"];
+        }
+      }
+    }
+    obj.confidentialMedicalHistory.applicantsHealthData[0].bloodDisorders =
+      "Blood disorders. e.g. anemia, bleeding disorders, leukemia";
+    obj.confidentialMedicalHistory.applicantsHealthData[1].cancer =
+      "Cancer, growths or tumors whether benign or malignant";
+    obj.confidentialMedicalHistory.applicantsHealthData[2].cardiovascular =
+      "Cardiovascular (heart and blood vessels) disorders e.g. high blood pressure, varicose veins, palpitations, deep vein thrombosis";
+    obj.confidentialMedicalHistory.applicantsHealthData[3].earNoseDisorders =
+      "Ear, nose and throat disorders e.g. hearing/speech impairment, ear infections, sinus problems, nasal/throat surgery, tonsils, adenoids, previous nasal injuries, upper airway infections, epistaxis";
+    obj.confidentialMedicalHistory.applicantsHealthData[4].endocrinedisorders =
+      "Endocrine disorders e.g. diabetes, high cholesterol , thyroid abnormalities";
+    obj.confidentialMedicalHistory.applicantsHealthData[5].eyeRelatedDisorders =
+      "Eye related disorders e.g. blindness, glaucoma, eye surgery, , cataracts, lens implants, refractive and laser surgery";
+    obj.confidentialMedicalHistory.applicantsHealthData[6].genitoUrinary =
+      "Genito-urinary system e.g. Pelvic inflammatory disease prostate problem, abnormalities of the penis, scrotum. Reproductive system, blood in the urine, kidney stones, kidney failure, bladder problems, Dialysis";
+    obj.confidentialMedicalHistory.applicantsHealthData[7].gastroIntestinal =
+      "Gastro-intestinal disorders e.g. recurrent indigestion, heartburn, ulcers, hernia, piles, fissures. Have you ever had any endoscopic study of the oesophagus, stomach or colon?";
+    obj.confidentialMedicalHistory.applicantsHealthData[8].gynecologicalAndObstetrical =
+      "Gynecological and obstetrical disorders e.g. Fibroids, ectopic pregnancy, caesarian section, Menstrual irregularities. Abnormal pap smear, receiving hormone treatment. Uterine bleeding, Laparoscopic surgery, Dilatation and curettage, miscarriages, pregnancy related problems. Pregnant, if positive, provide expected date of delivery (dd/mm/yy)";
+    obj.confidentialMedicalHistory.applicantsHealthData[9].musculoSkeletal =
+      "Musculo-skeletal disorders e.g. arthritis, Back problems, gout, osteoporosis. All joint problems and fractures";
+    obj.confidentialMedicalHistory.applicantsHealthData[10].neurologicalDisorders =
+      "Neurological disorders e.g. epilepsy, Stroke. Brain or spinal cord disorders, Headache, migraine, Paralysis, meningitis";
+    obj.confidentialMedicalHistory.applicantsHealthData[11].psychologicalDisorders =
+      "Psychological disorders e.g. alcohol or drug dependency, anxiety disorder, insomnia, depression, stress, attention deficit disorder, post traumatic stress, attempted suicide,";
+    obj.confidentialMedicalHistory.applicantsHealthData[12].respiratoryDisorders =
+      "Respiratory disorders e.g. asthma, rhinitis, chronic bronchitis, cigarette smoking related disorders, tuberculosis, persistent cough, allergies, chronic obstruction pulmonary disease, shortness of breath.";
+    obj.confidentialMedicalHistory.applicantsHealthData[13].skinDisorders =
+      "Skin disorders e.g. eczema, melanoma, skin cancer, burns, scars, keloids, warts";
+    obj.confidentialMedicalHistory.applicantsHealthData[14].stateWhether =
+      "State whether you or any of your dependants have received medical advice or treatment for any tropical disease e.g. leprosy, sleeping sickness, elephantiasis, bilharzia, yellow fever";
+    obj.confidentialMedicalHistory.applicantsHealthData[15].sexualTransmitted =
+      "Have you or any of your dependants ever sought counseling or treatment in connection with sexual transmitted infection e.g. gonorrhoea, syphilis, herpes simplex, Chlamydia";
+    obj.confidentialMedicalHistory.applicantsHealthData[16].HivAids =
+      "Have you or any of your dependants ever sought counseling or treatment in connection with HIV or AIDS infections or tested positive for HIV or AIDS?";
+    obj.confidentialMedicalHistory.applicantsHealthData[17].hereditary =
+      "Do you or any of your dependants have any hereditary disorders, birth defects or congenital conditions?";
+    obj.confidentialMedicalHistory.applicantsHealthData[18].dentalTreatment =
+      "Do you or any of your dependants have incomplete dental treatment plan, dental implants, orthodontic treatment, dentures, and wisdom teeth problems or do you or any of your dependants currently receive, or expect to receive dental treatment in the next 12 months?";
+    obj.confidentialMedicalHistory.applicantsHealthData[19].specializedTreatment =
+      "Investigations and/or specialized treatment: In and out of hospital a) Are you or any of your dependants currently undergoing or expect to undergo investigations for any medical condition and / or symptoms not yet diagnosed? b) Are you or any of your dependants currently receiving, or expect to receive specialized treatment (i.e. chemotherapy, radiotherapy, bone marrow transplant, mechanical ventilation, oxygen therapy, dialysis, psychotherapy or counseling?";
+    obj.confidentialMedicalHistory.applicantsHealthData[20].medication =
+      "Are you or any of your dependants on any medication (please indicate in the table provided below)";
+
+    let data = await medical_cover_kycModel
+      .findOne({ order_id: obj.order_id, is_deleted: false })
+      .sort({ create_date: -1 });
+    if (data) {
+      if (!obj.idDoc) {
+        obj.idDoc = data.idDoc;
+      }
+      if (!obj.krapinDoc) {
+        obj.pinDoc = data.pinDoc;
+      }
+
+      let updatedData = _.assign(data, obj);
+      await updatedData.save();
+    } else {
+      data = new medical_cover_kycModel(obj);
+      data = await medical_cover_kycModel.create(data);
+      console.log(data);
+    }
+
+    apiLog.createApiLog(req, send_response(data, false, ""));
+    res.send(send_response(data, false, ""));
+
+    await orderModel.updateOne(
+      { _id: obj.order_id, is_deleted: false },
+      { $set: { is_kyc: true, kycStatus: "process" } }
+    );
+    let applicantsHealthData =
+      obj.confidentialMedicalHistory.applicantsHealthData;
+
+    //Blood disorders
+    let questionNo1,
+      questionNo2,
+      questionNo3,
+      questionNo4,
+      questionNo5,
+      questionNo6,
+      questionNo7,
+      questionNo8,
+      questionNo9,
+      questionNo10,
+      questionNo11,
+      questionNo12,
+      questionNo13,
+      questionNo14,
+      questionNo15,
+      questionNo16,
+      questionNo17,
+      questionNo18,
+      questionNo19,
+      questionNo20,
+      questionNo21;
+    let dependantHealthStatus;
+
+    questionNo1 = applicantsHealthData[0].questionNo;
+    questionNo2 = applicantsHealthData[1].questionNo;
+    questionNo3 = applicantsHealthData[2].questionNo;
+    questionNo4 = applicantsHealthData[3].questionNo;
+    questionNo5 = applicantsHealthData[4].questionNo;
+    questionNo6 = applicantsHealthData[5].questionNo;
+    questionNo7 = applicantsHealthData[6].questionNo;
+    questionNo8 = applicantsHealthData[7].questionNo;
+    questionNo9 = applicantsHealthData[8].questionNo;
+    questionNo10 = applicantsHealthData[9].questionNo;
+    questionNo11 = applicantsHealthData[10].questionNo;
+    questionNo12 = applicantsHealthData[11].questionNo;
+    questionNo13 = applicantsHealthData[12].questionNo;
+    questionNo14 = applicantsHealthData[13].questionNo;
+    questionNo15 = applicantsHealthData[14].questionNo;
+    questionNo16 = applicantsHealthData[15].questionNo;
+    questionNo17 = applicantsHealthData[16].questionNo;
+    questionNo18 = applicantsHealthData[17].questionNo;
+    questionNo19 = applicantsHealthData[18].questionNo;
+    questionNo20 = applicantsHealthData[19].questionNo;
+    questionNo21 = applicantsHealthData[20].questionNo;
+
+    let dependantStatus = [];
+    for (let i = 1; i <= data.dependant.length; i++) {
+      dependantStatus.push("No " + i);
+    }
+
+    let checkStatus = [];
+    let allcheckStatus = [];
+    for (let j = 0; j < 21; j++) {
+      checkStatus = [];
+      dependantHealthStatus = applicantsHealthData[j].dependantHealthStatus;
+      for (let i = 0; i < dependantHealthStatus.length; i++) {
+        if (dependantHealthStatus[i]["checkbox" + (j + 1)]) {
+          checkStatus[i] = "Yes";
+        } else {
+          checkStatus[i] = "No";
+        }
+      }
+      allcheckStatus.push(checkStatus);
+    }
+    let dateOfBirth = moment(data.dateOfBirth).format("MM-DD-YYYY");
+
+    let dependant = obj.dependant;
+    let pinDoc;
+    if (data.pinDoc) {
+      pinDoc = config.URL + "/uploads/" + data.pinDoc;
+    } else {
+      pinDoc = config.URL + "/uploads/noImage.jpg";
+    }
+    let idDoc;
+    if (data.idDoc) {
+      idDoc = config.URL + "/uploads/" + data.idDoc;
+    } else {
+      idDoc = config.URL + "/uploads/noImage.jpg";
+    }
+
+    let replace_var = {
+      surname: data.surname,
+      title: data.title,
+      otherName: data.otherName,
+      idNo: data.idNo,
+      idDocument: idDoc, //image
+      pinNo: data.pinNo,
+      pinDocument: pinDoc, //image
+      gender: data.gender,
+      maritalStatus: data.maritalStatus,
+      NHIFNumber: data.nhifNo,
+      DOB: dateOfBirth,
+      employerName: data.employerName,
+      occupation: data.occupation,
+      nationality: data.nationality,
+
+      postalAddress: data.contactInformation.postalAddress,
+      homeAddress: data.contactInformation.homeAddress,
+      officeTelephone: data.contactInformation.officeTelephone,
+      mobileNo: data.contactInformation.mobileNo,
+      email: data.contactInformation.email,
+
+      kinFullName: data.nextOfKin.fullName,
+      kinRelationShip: data.nextOfKin.relationShip,
+      kinIdNo: data.nextOfKin.idNo,
+      kinTelephoneNo: data.nextOfKin.telephoneNo,
+      kinPostalAddress: data.nextOfKin.postalAddress,
+
+      beneficiaryFullName: data.lastExpenseAndGroupLifeBeneficiary.fullName,
+      beneficiaryRelationShip:
+        data.lastExpenseAndGroupLifeBeneficiary.relationShip,
+      beneficiaryIdNo: data.lastExpenseAndGroupLifeBeneficiary.idNo,
+      beneficiaryTelephoneNo:
+        data.lastExpenseAndGroupLifeBeneficiary.telephoneNo,
+      beneficiaryPostalAddress:
+        data.lastExpenseAndGroupLifeBeneficiary.postalAddress,
+
+      dependant: dependant,
+
+      questionNo1: questionNo1,
+      questionNo2: questionNo2,
+      questionNo3: questionNo3,
+      questionNo4: questionNo4,
+      questionNo5: questionNo5,
+      questionNo6: questionNo6,
+      questionNo7: questionNo7,
+      questionNo8: questionNo8,
+      questionNo9: questionNo9,
+      questionNo10: questionNo10,
+      questionNo11: questionNo11,
+      questionNo12: questionNo12,
+      questionNo13: questionNo13,
+      questionNo14: questionNo14,
+      questionNo15: questionNo15,
+      questionNo16: questionNo16,
+      questionNo17: questionNo17,
+      questionNo18: questionNo18,
+      questionNo19: questionNo19,
+      questionNo20: questionNo20,
+      questionNo21: questionNo21,
+
+      checkStatus1: allcheckStatus[0],
+      checkStatus2: allcheckStatus[1],
+      checkStatus3: allcheckStatus[2],
+      checkStatus4: allcheckStatus[3],
+      checkStatus5: allcheckStatus[4],
+      checkStatus6: allcheckStatus[5],
+      checkStatus7: allcheckStatus[6],
+      checkStatus8: allcheckStatus[7],
+      checkStatus9: allcheckStatus[8],
+      checkStatus10: allcheckStatus[9],
+      checkStatus11: allcheckStatus[10],
+      checkStatus12: allcheckStatus[11],
+      checkStatus13: allcheckStatus[12],
+      checkStatus14: allcheckStatus[13],
+      checkStatus15: allcheckStatus[14],
+      checkStatus16: allcheckStatus[15],
+      checkStatus17: allcheckStatus[16],
+      checkStatus18: allcheckStatus[17],
+      checkStatus19: allcheckStatus[18],
+      checkStatus20: allcheckStatus[19],
+      checkStatus21: allcheckStatus[20],
+
+      dependantStatus: dependantStatus,
+
+      bloodDisorders: applicantsHealthData[0].bloodDisorders,
+      cancer: applicantsHealthData[1].cancer,
+      cardiovascular: applicantsHealthData[2].cardiovascular,
+      earNoseDisorders: applicantsHealthData[3].earNoseDisorders,
+      endocrinedisorders: applicantsHealthData[4].endocrinedisorders,
+      eyeRelatedDisorders: applicantsHealthData[5].eyeRelatedDisorders,
+      genitoUrinary: applicantsHealthData[6].genitoUrinary,
+      gastroIntestinal: applicantsHealthData[7].gastroIntestinal,
+      gynecologicalAndObstetrical:
+        applicantsHealthData[8].gynecologicalAndObstetrical,
+      musculoSkeletal: applicantsHealthData[9].musculoSkeletal,
+      neurologicalDisorders: applicantsHealthData[10].neurologicalDisorders,
+      psychologicalDisorders: applicantsHealthData[11].psychologicalDisorders,
+      respiratoryDisorders: applicantsHealthData[12].respiratoryDisorders,
+      skinDisorders: applicantsHealthData[13].skinDisorders,
+      stateWhether: applicantsHealthData[14].stateWhether,
+      sexualTransmitted: applicantsHealthData[15].sexualTransmitted,
+      HivAids: applicantsHealthData[16].HivAids,
+      hereditary: applicantsHealthData[17].hereditary,
+      dentalTreatment: applicantsHealthData[18].dentalTreatment,
+      specializedTreatment: applicantsHealthData[19].specializedTreatment,
+      medication: applicantsHealthData[20].medication,
+    };
+    templates.render(
+      templatesDir + "/medicalCoverKyc.html",
+      replace_var,
+      async function (err, html, text) {
+        if (err) {
+          apiLog.createApiLog(req, send_response(null, true, err.message));
+          return res.send(send_response(null, true, err.message));
+        } else {
+          let options = { format: "Letter", timeout: "100000" };
+          let filename = "medicalCover.pdf";
+
+          await pdf
+            .create(html, options)
+            .toFile("../public/uploads/" + filename, async function (err, res) {
+              if (err) {
+                console.log(err.message);
+              } else {
+                sendRiskNoteMail(data, "Medical", filename);
+              }
+            });
+        }
+      }
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+exports.futureExpireKyc = async (req, res) => {
+  try {
+    let saas_id = mongoose.Types.ObjectId(req.body.saas_id);
+    let user_id = mongoose.Types.ObjectId(req.body.user_id);
+    let saasData = await SaasModel.findOne({ _id: saas_id, is_deleted: false });
+    let futureExpireKycData = [];
+    if (saasData) {
+      let OrderData;
+      if (saasData.isMain) {
+        OrderData = await orderModel
+          .find({
+            is_deleted: false,
+            user_id: user_id,
+            order_status: "confirmed",
+            expiryDate: { $gte: new Date() },
+          })
+          .sort({ create_date: -1 });
+      } else {
+        OrderData = await orderModel
+          .find({
+            is_deleted: false,
+            saas_id: saas_id,
+            user_id: user_id,
+            order_status: "confirmed",
+            expiryDate: { $gte: new Date() },
+          })
+          .sort({ create_date: -1 });
+      }
+      if (OrderData && OrderData.length > 0) {
+        for (let order_index in OrderData) {
+          let jsonOrder = JSON.parse(JSON.stringify(OrderData[order_index]));
+          let paymentData = await paymentModel.findOne({
+            order_id: OrderData[order_index],
+            is_deleted: false,
+            payment_status: "success",
+          });
+          if (paymentData) {
+            jsonOrder.paymentData = paymentData;
+            let insurance_kycData = await insurance_kycModel.findOne({
+              order_id: OrderData[order_index],
+              is_deleted: false,
+            });
+            jsonOrder.insuranceData = insurance_kycData;
+            jsonOrder.productname = jsonOrder.product_id.name;
+            jsonOrder.categoryname = jsonOrder.category_id.name;
+            jsonOrder.packagename = jsonOrder.package_id.name;
+            jsonOrder.company_name =
+              jsonOrder.package_id.saas_id.insurance_comapany_id.name;
+            futureExpireKycData.push(jsonOrder);
+          }
+        }
+        if (futureExpireKycData && futureExpireKycData.length > 0) {
+          apiLog.createApiLog(
+            req,
+            send_response(futureExpireKycData, false, "")
+          );
+          res.send(send_response(futureExpireKycData, false, ""));
+        } else {
+          apiLog.createApiLog(
+            req,
+            send_response(null, true, "Payment not done yet")
+          );
+          res.send(send_response(null, true, "Payment not done yet"));
+        }
+        true;
+      } else {
+        apiLog.createApiLog(req, send_response(null, false, "Order not found"));
+        res.send(send_response(null, false, "Order not found"));
+      }
+    } else {
+      apiLog.createApiLog(req, send_response(null, false, "Saas not found"));
+      res.send(send_response(null, false, "Saas not found"));
+    }
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.expiredPolicy = async (req, res) => {
+  try {
+    let saas_id = mongoose.Types.ObjectId(req.body.saas_id);
+    let user_id = mongoose.Types.ObjectId(req.body.user_id);
+    let saasData = await SaasModel.findOne({ _id: saas_id, is_deleted: false });
+    let futureExpireKycData = [];
+    if (saasData) {
+      let OrderData;
+      if (saasData.isMain) {
+        OrderData = await orderModel
+          .find({
+            is_deleted: false,
+            user_id: user_id,
+            order_status: "confirmed",
+            expiryDate: { $lte: new Date() },
+          })
+          .sort({ create_date: -1 });
+      } else {
+        OrderData = await orderModel
+          .find({
+            is_deleted: false,
+            saas_id: saas_id,
+            user_id: user_id,
+            order_status: "confirmed",
+            expiryDate: { $lte: new Date() },
+          })
+          .sort({ create_date: -1 });
+      }
+      if (OrderData && OrderData.length > 0) {
+        for (let order_index in OrderData) {
+          let jsonOrder = JSON.parse(JSON.stringify(OrderData[order_index]));
+          let paymentData = await paymentModel.findOne({
+            order_id: OrderData[order_index],
+            is_deleted: false,
+            payment_status: "success",
+          });
+          jsonOrder.paymentData = paymentData;
+          let insurance_kycData = await insurance_kycModel.findOne({
+            order_id: OrderData[order_index],
+            is_deleted: false,
+          });
+          jsonOrder.insuranceData = insurance_kycData;
+          jsonOrder.productname = jsonOrder.product_id.name;
+          jsonOrder.categoryname = jsonOrder.category_id.name;
+          jsonOrder.packagename = jsonOrder.package_id.name;
+          jsonOrder.company_name =
+            jsonOrder.package_id.saas_id.insurance_comapany_id.name;
+          futureExpireKycData.push(jsonOrder);
+        }
+        apiLog.createApiLog(req, send_response(futureExpireKycData, false, ""));
+        res.send(send_response(futureExpireKycData, false, ""));
+      } else {
+        apiLog.createApiLog(req, send_response(null, false, "Order not found"));
+        res.send(send_response(null, false, "Order not found"));
+      }
+    } else {
+      apiLog.createApiLog(req, send_response(null, false, "Saas not found"));
+      res.send(send_response(null, false, "Saas not found"));
+    }
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+exports.OrderWithAgentCode = async (req, res) => {
+  try {
+    let saas_id = mongoose.Types.ObjectId(req.body.saas_id);
+    let agent_code = req.body.agent_code;
+    let limit = req.body.limit;
+    let skip = req.body.skip;
+    let OrderData = await orderModel
+      .find({ is_deleted: false, saas_id: saas_id, referralCode: agent_code })
+      .sort({ create_date: -1 })
+      .limit(limit)
+      .skip(skip);
+    let totalRecords = await orderModel.countDocuments({
+      is_deleted: false,
+      saas_id: saas_id,
+      referralCode: agent_code,
+    });
+    if (OrderData && OrderData.length > 0) {
+      let jsonOrder = JSON.parse(JSON.stringify(OrderData));
+      let totalCommission = 0;
+      let pendingCommission = 0;
+      let confirmCommission = 0;
+      for (let order_index in jsonOrder) {
+        let account_entry_data = await account_entryModel.findOne({
+          order_id: jsonOrder[order_index],
+          is_deleted: false,
+        });
+        if (account_entry_data) {
+          if (account_entry_data["credit_amount"]) {
+            if (jsonOrder[order_index].order_status == "confirmed") {
+              confirmCommission =
+                confirmCommission +
+                parseInt(account_entry_data["credit_amount"]);
+            } else {
+              pendingCommission =
+                pendingCommission +
+                parseInt(account_entry_data["credit_amount"]);
+            }
+            jsonOrder[order_index].commission =
+              account_entry_data["credit_amount"];
+          }
+        } else {
+          jsonOrder[order_index].commission = 0;
+        }
+      }
+      let agentCommissionData = await agentCommissionModel.find({
+        agent_code: agent_code,
+        is_deleted: false,
+      });
+      let totalWidhdrawAmount = 0;
+      if (agentCommissionData) {
+        for (let i in agentCommissionData) {
+          totalWidhdrawAmount =
+            totalWidhdrawAmount + parseInt(agentCommissionData[i].amount);
+        }
+      }
+      totalCommission = pendingCommission + confirmCommission;
+      apiLog.createApiLog(
+        req,
+        send_response(
+          {
+            records: jsonOrder,
+            totalRecords: totalRecords,
+            totalCommission: totalCommission,
+            confirmCommission: confirmCommission,
+            pendingCommission: pendingCommission,
+            totalWidhdrawAmount: totalWidhdrawAmount,
+          },
+          false,
+          ""
+        )
+      );
+      res.send(
+        send_response(
+          {
+            records: jsonOrder,
+            totalRecords: totalRecords,
+            totalCommission: totalCommission,
+            confirmCommission: confirmCommission,
+            pendingCommission: pendingCommission,
+            totalWidhdrawAmount: totalWidhdrawAmount,
+          },
+          false,
+          ""
+        )
+      );
+    } else {
+      apiLog.createApiLog(req, send_response(null, false, "Order not found"));
+      res.send(send_response(null, false, "Order not found"));
+    }
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+const createPdf = async (html, filename) => {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage();
+  await page.setContent(html);
+  await page.pdf({ path: `../public/uploads/${filename}`, format: "a4" });
+  return filename;
+};
+
+exports.createSaasSearchInquiryLogPdf = async (req, res) => {
+  try {
+    let data = req.body;
+    let toDate = data.startdate;
+    let fromDate = new Date(data.enddate);
+    fromDate = fromDate.setDate(fromDate.getDate() + 1);
+    //let pdfDatas = await SaasSearchInquiryLogModel.find({
+    // create_date:{$lte:toDate},create_date:{ $gte:fromDate} // original query
+    //});
+    let pdfDatas = await SaasSearchInquiryLogModel.find({
+      create_date: { $gte: toDate, $lte: fromDate }, // updated query
+    });
+
+    if (pdfDatas.length === 0) {
+      return res.send(
+        send_response(pdfDatas, false, "There is no Email to sent")
+      );
+    }
+    pdfgenerator(pdfDatas, data);
+    return res.send(
+      send_response(
+        pdfDatas,
+        false,
+        "We have logged your request. Email will be send shortly"
+      )
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+const pdfgenerator = async (pdfDatas, data) => {
+  let replace_var;
+  let html;
+  let filename;
+  let mergedFileName;
+  let attachFilename = [];
+  let mergedPDF = [];
+  console.log("stating job: creating pdfs..");
+  for (let pdfData of pdfDatas) {
+    let searchInput = JSON.parse(pdfData.search_input);
+    replace_var = {
+      category: pdfData.category_id.name,
+      saas: pdfData.saas_id.name,
+      status: pdfData.status,
+      dateOfSearchLead: pdfData.create_date,
+      comment: pdfData.comment,
+      searchInput: searchInput,
+    };
+    html = await mailtemplate.searchLeadHtml(replace_var);
+    let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+    filename = `SearchLeadsReport_${rand_no}.pdf`;
+    let options = {
+      format: "Letter",
+      timeout: "100000",
+    };
+    let res = await createPdf(html, filename);
+    if (pdfDatas.length === 1) {
+      attachFilename.push(res);
+      break;
+    }
+    attachFilename.push(`../public/uploads/` + res);
+  }
+
+  if (attachFilename.length === 1) {
+    console.log(
+      "exiting job: creating pdfs, created 1 document '",
+      attachFilename[0],
+      "'"
+    );
+    console.log("sending pdf to", data.email);
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      attachFilename
+    );
+    return;
+  }
+  // creating filename for the merged file.
+  let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+  mergedFileName = `SearchLeadsReportMerged_${rand_no}`;
+
+  let options = { outName: mergedFileName, outPath: `../public/uploads` };
+
+  console.log("combining", attachFilename.length, "pdfs");
+  await combinePdfs(attachFilename, options);
+
+  mergedPDF.push(mergedFileName + ".pdf");
+
+  if (attachFilename.length > 0) {
+    console.log("sending merged pdf to", data.email);
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      mergedPDF
+    );
+  }
+};
+
+exports.createOrderDetailsPdf = async (req, res) => {
+  try {
+    let data = req.body;
+    let toDate = new Date(data.enddate);
+    toDate = toDate.setDate(toDate.getDate() + 1);
+    let fromDate = data.startdate;
+    let pdfDatas = await orderModel.find({
+      create_date: { $lte: toDate, $gte: fromDate },
+    });
+
+    if (pdfDatas.length === 0) {
+      return res.send(
+        send_response(
+          pdfDatas,
+          false,
+          "No orders found for the selected period"
+        )
+      );
+    }
+    orderPdfGen(pdfDatas, data);
+    return res.send(
+      send_response(
+        pdfDatas,
+        false,
+        "We have logged your request. Email will be send shortly"
+      )
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+const orderPdfGen = async (pdfDatas, data) => {
+  let replace_var;
+  let html;
+  let filename;
+  let mergedFileName;
+  let attachFilename = [];
+  let mergedPDF = [];
+
+  for (let pdfData of pdfDatas) {
+    let payment_data = await paymentModel.findOne({
+      order_id: pdfData._id,
+    });
+    let Order = await orderModel.findOne({ _id: pdfData._id });
+    if (!payment_data) {
+      payment_data = {
+        transaction_id: "", //payment_data.transaction_id,
+        msisdn: "", //payment_data.msisdn,
+        payment_mode: "", //payment_data.payment_mode,
+        payment_status: "", //payment_data.payment_status
+      };
+    }
+    replace_var = {
+      order_id: Order._id,
+      date_created: Order.create_date,
+      date_updated: Order.last_updated,
+      policyNumber: pdfData.policyNumber,
+      expiryDate: pdfData.expiryDate,
+      saasName: pdfData.saas_id.name,
+      companyName: pdfData.saas_id.insurance_comapany_id.name,
+      categoryName: pdfData.category_id.name,
+      productName: pdfData.product_id.name,
+      packageName: pdfData.package_id.name,
+      userName: pdfData.user_id.name,
+      orderStatus: pdfData.order_status,
+      packageAmount: pdfData.package_amount,
+      taxAmount: pdfData.tax_amount,
+      totalAmount: pdfData.total_amount,
+      transactionId: payment_data.transaction_id,
+      mobileNumber: payment_data.msisdn,
+      paymentMode: payment_data.payment_mode,
+      paymentStatus: payment_data.payment_status,
+    };
+    html = await mailtemplate1.orderLeadHtml(replace_var);
+
+    let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+    filename = `OrderLeadsReport_${rand_no}.pdf`;
+    let options = {
+      format: "Letter",
+      timeout: "100000",
+    };
+    let res = await createPdf(html, filename);
+
+    if (pdfDatas.length === 1) {
+      attachFilename.push(res);
+      break;
+    }
+    attachFilename.push(`../public/uploads/` + res);
+  }
+  if (attachFilename.length === 1) {
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      attachFilename
+    );
+    return;
+  }
+
+  // creating filename for the merged file.
+  let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+  mergedFileName = `OrderLeadsReportMerged_${rand_no}`;
+
+  let options = { outName: mergedFileName, outPath: `../public/uploads` };
+  await combinePdfs(attachFilename, options);
+  mergedPDF.push(mergedFileName + ".pdf");
+  if (attachFilename.length > 0) {
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      mergedPDF
+    );
+  }
+};
+
+exports.exportPaymentReport = async (req, res) => {
+  try {
+    let data = req.body;
+    let toDate = new Date(data.enddate);
+    toDate = toDate.setDate(toDate.getDate() + 1);
+    let fromDate = data.startdate;
+    let pdfDatas = await paymentModel.find({
+      // todo
+      create_date: { $lte: toDate, $gte: fromDate },
+    });
+    if (pdfDatas.length === 0) {
+      return res.send(
+        send_response(pdfDatas, false, "There is no Email to sent")
+      );
+    }
+    paymentPdfGen(pdfDatas, data);
+    return res.send(
+      send_response(
+        pdfDatas,
+        false,
+        "We have logged your request. Email will be send shortly"
+      )
+    );
+  } catch (e) {
+    apiLog.createApiLog(req, send_response(null, true, e.message));
+    res.send(send_response(null, true, e.message));
+  }
+};
+
+const paymentPdfGen = async (pdfDatas, data) => {
+  let replace_var;
+  let html;
+  let filename;
+  let mergedFileName;
+  let attachFilename = [];
+  let mergedPDF = [];
+  for (let pdfData of pdfDatas) {
+    let featureName = [];
+    let features = pdfData.order_id.feature_id;
+    for (let fea of features) {
+      featureName.push(fea.name);
+    }
+    replace_var = {
+      transactionId: pdfData.transaction_id,
+      transactionNumber: pdfData.transactionNumber,
+      orderId: pdfData.order_id._id,
+      saasName: pdfData.order_id.saas_id.name,
+      companyName: pdfData.order_id.saas_id.insurance_comapany_id.name,
+      categoryName: pdfData.order_id.category_id.name,
+      packageName: pdfData.order_id.package_id.name,
+      paymentMode: pdfData.payment_mode,
+      amount: pdfData.amount,
+      paymentStatus: pdfData.payment_status,
+      mobileNumber: pdfData.msisdn,
+      features: featureName,
+    };
+    html = await mailtemplate2.paymentLeadHtml(replace_var);
+    let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+    filename = `PaymentLeadsReport_${rand_no}.pdf`;
+    let options = {
+      format: "A4",
+      timeout: "100000",
+    };
+    let res = await createPdf(html, options, filename);
+    if (pdfDatas.length === 1) {
+      attachFilename.push(res);
+      break;
+    }
+    attachFilename.push(`../public/uploads/` + res);
+  }
+  if (attachFilename.length === 1) {
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      attachFilename
+    );
+    return;
+  }
+
+  // creating filename for the merged file.
+  let rand_no = Date.now() + Math.floor(Math.random() * 90 + 100);
+  mergedFileName = `PaymentLeadsReportMerged_${rand_no}`;
+
+  let options = { outName: mergedFileName, outPath: `../public/uploads` };
+  await combinePdfs(attachFilename, options);
+  mergedPDF.push(mergedFileName + ".pdf");
+  if (attachFilename.length > 0) {
+    await mail.mailSendPDF(
+      data.email,
+      "Your Application Details",
+      html,
+      mergedPDF
+    );
+    //return res.send(send_response(pdfDatas, false, "Email Sent Successfully!"));
+  } else {
+    // return res.send(send_response({}, true, "Not able to Sent Email!"));
+  }
+};

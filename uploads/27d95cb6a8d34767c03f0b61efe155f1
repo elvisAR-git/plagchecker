@@ -1,0 +1,78 @@
+
+import os
+from os.path import basename
+import subprocess
+import json
+
+
+configs = json.load(open("./config.json"))
+print("[*-*-*-*-*-*-*-*-*-*-*-*EMtOOLS-*-*-*live-v1.0.0*-*-*-*-*-*-*-*-*-*]\n")
+print("[+] Using python"+str(configs.get("python_version")) +
+      f" to run {configs.get('entry_file')} file")
+
+
+class File_D:
+    def __init__(self, filename):
+        self.cached_stamp = 0
+        self.filename = filename
+
+    def is_changed(self):
+        if os.stat(self.filename).st_mtime != self.cached_stamp and self.cached_stamp != 0:
+            self.cached_stamp = os.stat(self.filename).st_mtime
+            return True
+        elif os.stat(self.filename).st_mtime != self.cached_stamp and self.cached_stamp == 0:
+            self.cached_stamp = os.stat(self.filename).st_mtime
+            return False
+        else:
+            return False
+
+
+FILES = []
+
+
+DIR_NAME = os.path.dirname(os.path.abspath(__file__)) + "/"
+
+if configs.get("dir") != "":
+    DIR_NAME = configs.get("dir")
+
+for root, dirs, files in os.walk(DIR_NAME):
+    path = root.split(os.sep)
+    base_name = os.path.basename(root)
+    for file in files:
+        if root == "":
+            FILE = f'{root}'+file
+        else:
+            FILE = f'{root}/'+file
+        FILE = File_D(FILE)
+        FILES.append(FILE)
+
+print(f"[+] Watching changes of {len(FILES)} files in {DIR_NAME}\n\n")
+
+pid = []
+
+
+def fx(restart=False):
+    global pid
+    if restart:
+        pid[0].kill()
+        pid.clear()
+        pid_s = subprocess.Popen(
+            [f"python{configs.get('python_version')}", f"{DIR_NAME}{configs.get('entry_file')}"])
+        pid.append(pid_s)
+    else:
+        pid_s = subprocess.Popen(
+            [f"python{configs.get('python_version')}", f"{DIR_NAME}{configs.get('entry_file')}"])
+        pid.append(pid_s)
+
+
+fx()
+while True:
+    for file in FILES:
+        if file.is_changed():
+            # RELOAD THE CONFIGURATIONS
+            configs = json.load(open("./config.json"))
+            print(f"[*] Restarting because of changes in {file.filename}\n\n")
+            try:
+                fx(True)
+            except:
+                print("Error! waiting for file changes")

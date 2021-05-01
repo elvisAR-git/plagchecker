@@ -1,0 +1,28 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var crypto = require('crypto');
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var UserNotificationSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false}, // SaaS ID is 0 if its belongs BISMART
+    user_id :{type: Schema.Types.ObjectId, ref: 'User', autopopulate:false},
+    device_id: {type:String},
+    device_platform: {type:String},
+    token: {type:String},
+    status: {type:Boolean, default: false},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+UserNotificationSchema.plugin(autopopulate);
+
+UserNotificationSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('UserNotification', UserNotificationSchema);	

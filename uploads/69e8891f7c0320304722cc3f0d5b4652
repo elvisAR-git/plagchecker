@@ -1,0 +1,27 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var FaqSchema = new Schema({
+    saas_id: {type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false}, // SaaS ID is 0 if its belongs BISMART
+    category_id : {type: Schema.Types.ObjectId, ref: 'FaqCategory', autopopulate:true}, // faq_category id
+    topic_id:  {type: Schema.Types.ObjectId, ref: 'FaqTopic', autopopulate:true},// faq_topic id
+    question: {type:String, default: null}, 
+    answer: {type:String, default: null}, 
+	status: {type:Boolean, default: false},
+    is_deleted: {type: Boolean, default: false },
+}, schemaOptions);
+
+FaqSchema.plugin(autopopulate);
+
+FaqSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('Faq', FaqSchema);

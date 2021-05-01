@@ -1,0 +1,30 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var AboutUsManagementTeamSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false},
+    name:{type: String, required: false, default: null},
+    image:{type: String, required: false, default: null},
+    designation: {type: String, default: null},
+    description:{type:String, default: null},
+    faceBook_link: {type: String, default: null},
+    gmail_link: {type: String, default: null},
+    twitter_link: {type: String, default: null},
+    status: {type:Boolean, default: true},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+AboutUsManagementTeamSchema.plugin(autopopulate);
+
+AboutUsManagementTeamSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('AboutUsManagementTeam', AboutUsManagementTeamSchema);	

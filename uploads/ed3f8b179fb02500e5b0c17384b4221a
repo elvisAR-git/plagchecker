@@ -1,0 +1,24 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var ResetPasswordSchema = new Schema({
+    user_id:{type: Schema.Types.ObjectId, ref: 'User', autopopulate:false},
+    email:{type: String, default: ""},
+    url_code:{type:String, default: ""},
+    hitFag: { type: Boolean, default: false },
+}, schemaOptions);
+
+ResetPasswordSchema.plugin(autopopulate);
+
+ResetPasswordSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('ResetPassword', ResetPasswordSchema);	

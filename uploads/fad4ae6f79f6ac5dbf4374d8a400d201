@@ -1,0 +1,16 @@
+const express = require("express");
+const cors = require("cors");
+const app = express();
+var PORT = 4000;
+
+var api = require("./api");
+
+app.use(cors());
+app.use(
+  express.json({
+    type: "application/json",
+  })
+);
+app.use("", api);
+
+app.listen(PORT, "localhost", () => console.log(`Running @ Port ${PORT}`));

@@ -1,0 +1,136 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var crypto = require('crypto');
+var autopopulate = require('mongoose-autopopulate');
+var authTypes = ['github', 'twitter', 'facebook', 'google', 'local'];
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: { createdAt: 'create_date', updatedAt: 'last_updated' }
+};
+
+var UserSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+	email: {type: String},
+    username: {type: String, default:''},
+	status: {type: Boolean},
+    hashedPassword: { type: String},
+    salt: String,
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+UserSchema.plugin(autopopulate);
+
+
+/**
+ * Virtuals
+ */
+UserSchema
+    .virtual('password')
+    .set(function (password) {
+        this._password = password;
+        this.salt = this.makeSalt();
+        this.hashedPassword = this.encryptPassword(password);
+    })
+    .get(function () {
+        return this._password;
+    });
+
+
+// Validate empty password
+UserSchema
+    .path('hashedPassword')
+    .validate(function (hashedPassword) {
+        if (authTypes.indexOf(this.provider) !== -1)
+            return true;
+        return hashedPassword.length;
+    }, 'Password can not be empty'); //Password cannot be blank
+
+
+
+// Validate fullname is not taken
+UserSchema
+    .path('email')
+    .validate(function (value, respond) {
+        var self = this;
+        this.constructor.findOne({ email: value, is_deleted:false }, function (err, user) {
+            if (err)
+                throw err;
+            if (user) {
+                if (self.id === user.id)
+                    return respond(true);
+                return respond(false);
+            }
+            // respond(true);
+        });
+    }, 'The specified email address is already in use'); //The specified email address is already in use.
+
+
+
+var validatePresenceOf = function (value) {
+    return value && value.length;
+};
+/**
+ * Pre-save hook
+ */
+UserSchema.pre('save', function (next) {
+    this.last_updated = new Date();
+    if (!this.isNew) {
+        return next();
+    }
+    if (this.name === null) {
+        this.name = "";
+        return next();
+    }
+    var self = this;
+    if (!validatePresenceOf(this.hashedPassword) && authTypes.indexOf(this.provider) === -1) {
+        next(new Error('Incorrect password')); //Invalid password
+    } else {
+        next();
+    }
+});
+/**
+ * Methods
+ */
+UserSchema.methods = {
+    /**
+     * Authenticate - check if the passwords are the same
+     *
+     * @param {String} plainText
+     * @return {Boolean}
+     * @api public
+     */
+    authenticate: function (plainText) {
+
+        return this.encryptPassword(plainText) === this.hashedPassword;
+    },
+    /**
+     * Make salt
+     *
+     * @return {String}
+     * @api public
+     */
+    makeSalt: function () {
+        return crypto.randomBytes(16).toString('base64');
+    },
+    /**
+     * Encrypt password
+     *
+     * @param {String} password
+     * @return {String}
+     * @api public
+     */
+    encryptPassword: function (password) {
+        if (!password || !this.salt)
+            return '';
+        var salt = new Buffer(this.salt, 'base64');
+        var pwd = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha1').toString('base64');
+
+        return pwd;
+    }
+};
+
+module.exports = mongoose.model('User', UserSchema);

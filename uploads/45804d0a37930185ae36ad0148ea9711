@@ -1,0 +1,25 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var ClientFeedbackSchema = new Schema({
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:false}, // SaaS ID is 0 if its belongs BISMART
+    title:{type: String, required: false,  default: ''},
+    content:{type: String, required: false, default: ''},
+    status: {type:Boolean, default: true},
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+ClientFeedbackSchema.plugin(autopopulate);
+
+ClientFeedbackSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('ClientFeedback', ClientFeedbackSchema);	

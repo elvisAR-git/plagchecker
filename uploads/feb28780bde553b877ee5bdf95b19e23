@@ -1,0 +1,478 @@
+import pygame
+import pygame.locals as GAME_LOCALS
+import pygame.event as GAME_EVENTS
+import random
+import time
+
+FPS = 45
+WIDTH = 720
+HEIGHT = 700
+LAST_SPAWN = 0
+SCORE = 0
+PLAYER_LIFE = 6
+game_window = pygame.display.set_mode((WIDTH, HEIGHT))
+
+clock = pygame.time.Clock()
+
+# loading graphics
+background_img = pygame.image.load('background.png')
+token_image = pygame.image.load('/home/elvis/Desktop/Space Legend/items/29.png')
+background_rect = background_img.get_rect()
+player_spaceship = pygame.image.load('/home/elvis/Desktop/Space Legend/items/11.png')
+player_spaceship_rect = player_spaceship.get_rect()
+enemey1 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/24.png')
+enemey2 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/25.png')
+
+enemey3 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/26.png')
+enemey_rect = enemey1.get_rect()
+bullet1 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/bullets/16.png')
+bullet3 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/bullets/4.png')
+bullet2 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/bullets/6.png')
+bullet2 = pygame.transform.rotate(bullet2, 180)
+bullet4 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/bullets/1.png')
+rockets = pygame.image.load('/home/elvis/Desktop/Space Legend/items/4.png')
+boss_image = pygame.image.load('/home/elvis/Desktop/Space Legend/items/2.png')
+boss_image = pygame.transform.scale(boss_image,(200,200))
+shield = pygame.image.load('/home/elvis/Desktop/Space Legend/items/32.png')
+shield = pygame.transform.scale(shield,(200,200))
+player_group = pygame.sprite.Group()
+
+move_left = False
+move_right = False
+shoot_bullet = False
+move_down = False
+move_up = False
+
+bullets = 0
+shot_1 = 0
+enemey_sprites = []
+
+
+class Player(pygame.sprite.Sprite):
+    global move_left, move_right, shoot_bullet, bullets
+
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = player_spaceship
+        self.rect = player_spaceship_rect
+        self.rect.center = (360, 680)
+        self.speed_x = 20
+        self.speed_y = 20
+        self.bullet = 3
+        self.radius = (self.rect.width * 0.85) / 2
+
+    def update(self):
+        global shot_1, WIDTH, move_down, move_up, move_left, move_right
+        bullet = 'bullet' + str(bullets)
+        temp = [bullet]
+        if self.rect.right >= WIDTH:
+            move_right = False
+        if self.rect.left <= 0:
+            move_left = False
+        if self.rect.top <= 0:
+            move_up = False
+        if self.rect.bottom >= HEIGHT:
+            move_down = False
+        if move_left:
+            self.rect.x -= self.speed_x
+
+        if move_right:
+            self.rect.x += self.speed_x
+        if shoot_bullet:
+            if shot_1 == 2:
+                temp = [Bullet((self.rect.x + 20, self.rect.y + 30))]
+                bullet_group.add(temp[0])
+                temp.clear()
+                temp = [Bullet((self.rect.x + 90, self.rect.y + 30))]
+                temp[0].change_bullet(self.bullet)
+                bullet_group.add(temp[0])
+                shot_1 = 0
+            else:
+                shot_1 = shot_1 + 1
+        if move_up:
+            self.rect.y -= self.speed_y
+        if move_down:
+            self.rect.y += self.speed_y
+    def update_bullet(self,type):
+        self.bullet = type
+
+player1 = Player()
+player_group.add(player1)
+
+enemey_group = pygame.sprite.Group()
+enemy_bullet_group = pygame.sprite.Group()
+enemy = 0
+shot_ = 0
+enemy_bullets = 0
+
+
+class Enemy(pygame.sprite.Sprite):
+
+    def __init__(self, height=-40):
+        global enemy, shot_
+        enemy += 1
+        pygame.sprite.Sprite.__init__(self)
+        values = [1, 2, 3]
+        random.shuffle(values)
+        self.name = 'enemy' + str(enemy)
+        if values[1] == 2:
+            self.image = enemey1
+            self.type = 'weak'
+        elif values[1] == 1:
+            self.image = enemey2
+            self.type = 'medium'
+        else:
+            self.image = enemey3
+            self.type = 'moderate'
+
+        self.rect = self.image.get_rect()
+        self.radius = (self.rect.width * 0.60) / 2
+        self.rect.center = (random.randrange(40, 680), height)
+        self.speed_y = random.randint(2, 4)
+        self.speed_x = random.randint(1, 3)
+        self.p = random.randint(1, 2)
+
+    def update(self):
+        global shot_
+        self.rect.y += self.speed_y
+        if self.p == 1:
+            self.rect.x += self.speed_x
+        else:
+            self.rect.x -= self.speed_x
+        if shot_ >= 30:
+            var = 'ebullet' + str(enemy_bullets)
+            temp = [var]
+            temp[0] = Enemy_Bullet((self.rect.x + 40, self.rect.y + 50))
+            enemy_bullet_group.add(temp[0])
+            shot_ = 0
+        else:
+            shot_ += 1
+
+        if self.rect.y >= 750 or self.rect.x >= 750 or self.rect.x <= -50:
+            self.rect.top = -60
+            self.speed_y = random.randint(5, 10)
+            self.rect.x = random.randint(40, 680)
+            values = [1, 2, 3]
+            random.shuffle(values)
+            if values[0] == 2:
+                self.image = enemey1
+            elif values[0] == 1:
+                self.image = enemey2
+            else:
+                self.image = enemey3
+
+
+killed_bosses = 3
+
+bad_guy1 = Enemy()
+bad_guy2 = Enemy()
+bad_guy3 = Enemy()
+bad_guy4 = Enemy(-100)
+bad_guy5 = Enemy(-60)
+
+enemey_sprites.append(bad_guy1)
+enemey_sprites.append(bad_guy2)
+enemey_sprites.append(bad_guy3)
+enemey_sprites.append(bad_guy4)
+enemey_sprites.append(bad_guy5)
+
+enemey_group.add(bad_guy4)
+enemey_group.add(bad_guy5)
+enemey_group.add(bad_guy1)
+enemey_group.add(bad_guy2)
+enemey_group.add(bad_guy3)
+
+bosses = 0
+boss_hits = 0
+boss_shots = 0
+bosses_group = pygame.sprite.Group()
+level = 7
+distance = 0
+
+
+def periodic_spawn(last_spawn):
+    global LAST_SPAWN, killed_bosses, bosses, enemy, level,distance, token
+    now = time.time()
+    last_spawn = last_spawn
+    if enemy < level:
+        name = 'enemy' + str(enemy)
+        temp = [name]
+        temp[0] = Enemy(-60)
+        enemey_group.add(temp[0])
+        LAST_SPAWN = time.time()
+        level = -60
+
+    if killed_bosses >= 2 or bosses < 1:
+        # spawning boss
+        if distance>= 30:
+            bosses += 1
+            nameboss = 'boss' + str(bosses)
+            temp2 = [nameboss]
+            temp2[0] = Bosses()
+            bosses_group.add(temp2[0])
+            temp2.clear()
+            bosses += 1
+            distance = 0
+            killed_bosses -= 1
+        if distance >= 60:
+            nameboss = 'boss' + str(bosses)
+            temp2 = [nameboss]
+            temp2[0] = Bosses()
+            bosses_group.add(temp2[0])
+            killed_bosses -= 0
+            distance = 0
+        else:
+            distance += 1
+    n = [range(100)]
+    random.shuffle(n)
+    if token >= 100 or n[0] == 1:
+        name = 'token'+ str(token)
+        tmp = [name]
+        tmp[0] = Upgrade()
+        upgrade_group.add(tmp[0])
+        token = 0
+    else:
+        token += 1
+
+upgrade_group = pygame.sprite.Group()
+
+bullet_img = 3
+
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, player_nose_coord):
+        global bullet_img,bullet2
+        pygame.sprite.Sprite.__init__(self)
+        if bullet_img == 1:
+            self.image = bullet1
+            self.rect = self.image.get_rect()
+        elif bullet_img == 2:
+            bullet2 = pygame.image.load('/home/elvis/Desktop/Space Legend/items/bullets/6.png')
+            self.image = bullet2
+            self.rect = self.image.get_rect()
+        elif bullet_img == 3:
+            self.image = bullet3
+            self.rect = self.image.get_rect()
+        elif bullet_img == 4:
+            self.image = bullet1
+            self.rect = self.image.get_rect()
+        else:
+            self.image = rockets
+            self.rect = self.image.get_rect()
+        self.rect.center = (player_nose_coord)
+        self.speed_y = 15
+        self.radius = (self.rect.width * 0.4) / 2
+
+    def update(self):
+        self.rect.y -= self.speed_y
+        if self.rect.top <= -50:
+            self.kill()
+
+    def change_bullet(self,type):
+        global bullet_img
+        bullet_img = type
+
+
+class Enemy_Bullet(pygame.sprite.Sprite):
+    def __init__(self, nose_coods, bullet='normal'):
+        if bullet == 'normal':
+            pygame.sprite.Sprite.__init__(self)
+            self.image = bullet1
+            self.rect = self.image.get_rect()
+            self.rect.center = nose_coods
+            self.radius = (self.rect.width * 0.4) / 2
+            self.speed_y = 9
+        else:
+            pygame.sprite.Sprite.__init__(self)
+            self.image = bullet2
+            self.rect = self.image.get_rect()
+            self.rect.center = nose_coods
+            self.radius = (self.rect.width * 0.4) / 2
+            self.speed_y = 10
+
+    def update(self):
+        self.rect.y += self.speed_y
+        if self.rect.bottom >= 750:
+            self.kill()
+
+
+shield_hits = 0
+shields = 0
+shield_group = pygame.sprite.Group()
+
+
+class Shield(pygame.sprite.Sprite):
+    def __init__(self, coods_to_put_shield, center, trace_speed, Boss=False):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = shield
+        self.rect = coods_to_put_shield
+        self.rect.center = center
+        self.Boss = Boss
+        self.speedx = trace_speed.get('speedx')
+        self.speedy = trace_speed.get('speedy')
+
+    def update(self):
+        global shield_hits, boss_hits
+        if self.Boss:
+            if self.rect.y >= 360:
+                self.speedy = -1
+            elif self.rect.y <= 0:
+                self.speedy = 1
+            if self.rect.x >= WIDTH:
+                self.speedx = -1
+            elif self.rect.x <= 0:
+                self.speedx = 1
+
+            self.rect.y += self.speedy
+            self.rect.x += self.speedx
+        else:
+            self.rect.x += self.speedx
+            self.rect.y += self.speedy
+
+        if shield_hits >= 70:
+            self.kill()
+            shield_hits = 0
+
+
+track = 0
+token = 0
+
+class Bosses(pygame.sprite.Sprite):
+    def __init__(self):
+        global bosses
+        pygame.sprite.Sprite.__init__(self)
+        name = 'boss' + str(bosses)
+        self.image = boss_image
+        self.image = pygame.transform.rotate(self.image, 180)
+        self.rect = self.image.get_rect()
+        self.radius = (self.rect.width / 2)
+        spawn_points = [-300, -600, -200, -60, -100, -700, -1000, -50]
+        random.shuffle(spawn_points)
+        self.rect.center = (random.randrange(150, 200), spawn_points[random.randrange(0,7)])
+        self.name = name
+        self.life = 80
+        self.speedy = random.randrange(1,3)
+        self.speedx = random.randrange(2,3)
+        shield_name = 'shiled' + str(shield)
+        temp = [shield_name]
+        temp[0] = Shield(self.image.get_rect(), self.rect.center, {'speedy': self.speedy, 'speedx': self.speedx}, True)
+        shield_group.add(temp[0])
+
+    def update(self):
+        global boss_hits, boss_shots, killed_bosses, bosses, track
+        if self.rect.y >= 360:
+            self.speedy = -1
+        elif self.rect.y <= 0:
+            self.speedy = 1
+        if self.rect.x >= WIDTH:
+            self.speedx = -1
+        elif self.rect.x <= 0:
+            self.speedx = 1
+
+        self.rect.y += self.speedy
+        self.rect.x += self.speedx
+
+        if boss_hits >= self.life:
+            print('boss kill!!!!')
+            killed_bosses += 1
+            self.kill()
+            boss_hits -= 80
+            bosses -= 1
+        if boss_shots >= 2 and track >= 20:
+            var = 'ebullet' + str(enemy_bullets)
+            temp = [var]
+            temp[0] = Enemy_Bullet((self.rect.x + 40, self.rect.y + 50), 'boss')
+            enemy_bullet_group.add(temp[0])
+            boss_shots = 0
+            track = 0
+        else:
+            boss_shots += 1
+            track += 1
+
+
+class Upgrade(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = token_image
+        self.rect = self.image.get_rect()
+        self.rect.center = (random.randrange(60,700), -800)
+        self.speed = 5
+
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.y >= 750:
+        	self.kill()
+
+
+bullet_group = pygame.sprite.Group()
+
+running = True
+
+hits_DB = []
+
+while running:
+    level += 5
+    clock.tick(FPS)
+    game_window.blit(background_img, background_rect)
+    player_group.draw(game_window)
+    player_group.update()
+    enemey_group.draw(game_window)
+    enemey_group.update()
+
+    bullet_group.draw(game_window)
+    bullet_group.update()
+    enemy_bullet_group.draw(game_window)
+    enemy_bullet_group.update()
+    bosses_group.draw(game_window)
+    bosses_group.update()
+    shield_group.draw(game_window)
+    shield_group.update()
+    upgrade_group.draw(game_window)
+    upgrade_group.update()
+    if pygame.sprite.groupcollide(player_group,upgrade_group,False,True):
+        player1.update_bullet(random.randrange(1,5))
+    if PLAYER_LIFE == 0:
+        print('Game over, you died! You destroyed :', SCORE, 'space ships')
+        running = False
+    for kill in pygame.sprite.groupcollide(bullet_group, enemey_group, True, True, pygame.sprite.collide_circle):
+        enemy -= 1
+        SCORE += 1
+
+    if pygame.sprite.groupcollide(player_group, enemey_group, False, True,
+                                  pygame.sprite.collide_circle) or pygame.sprite.groupcollide(player_group,
+                                                                                              enemy_bullet_group, False,
+                                                                                              True,
+                                                                                              pygame.sprite.collide_circle):
+        PLAYER_LIFE -= 1
+        print("you've been hit life level", PLAYER_LIFE)
+    periodic_spawn(LAST_SPAWN)
+    pygame.sprite.groupcollide(enemy_bullet_group, bullet_group, True, True)
+    if pygame.sprite.groupcollide(bosses_group, bullet_group, False, True):
+        boss_hits += 1
+        shield_hits += 1
+
+    for event in GAME_EVENTS.get():
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT:
+                move_left = True
+            if event.key == pygame.K_RIGHT:
+                move_right = True
+            if event.key == pygame.K_SPACE:
+                shoot_bullet = True
+            if event.key == pygame.K_UP:
+                move_up = True
+            if event.key == pygame.K_DOWN:
+                move_down = True
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_RIGHT:
+                move_right = False
+            if event.key == pygame.K_LEFT:
+                move_left = False
+            if event.key == pygame.K_SPACE:
+                shoot_bullet = False
+            if event.key == pygame.K_UP:
+                move_up = False
+            if event.key == pygame.K_DOWN:
+                move_down = False
+
+    pygame.display.update()

@@ -1,0 +1,229 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var health_insurance_kycSchema = new Schema({
+    order_id:{type: Schema.Types.ObjectId, ref: 'order', autopopulate:true},
+    saas_id:{type: Schema.Types.ObjectId, ref: 'Saas', autopopulate:true}, // SaaS ID is 0 if its belongs BISMART
+    user_id:{type: Schema.Types.ObjectId, ref: 'User', autopopulate:true},
+    category_id:{type: Schema.Types.ObjectId, ref: 'ProductCategory', autopopulate:true},
+    package_id:{type: Schema.Types.ObjectId, ref: 'saas_product_package', autopopulate:true},
+    title: { type: String, default: '' },
+    surname: { type: String, default: '' },
+    firstName: { type: String, default: '' },
+    otherName: { type: String, default: '' },
+    idNo: { type: String, default: '' },
+    idDoc: { type: String, default: '' }, //image
+    gender: { type: String, default: '' },
+    pinNo: { type: String, default: '' }, //pinNo
+    pinDoc: { type: String, default: '' }, //image //pinDoc
+    nhifNo: { type: String, default: '' },
+    dateOfBirth: {type: Date, default: new Date()},
+    maritialStatus: { type: String, default: '' },
+    height: { type: String, default: '' },
+    weight: { type: String, default: '' },
+    nameOfEmployer: { type: String, default: '' },
+    occupation: { type: String, default: '' },
+    nationality: { type: String, default: '' },
+    contactInformation: {
+        postalAddress: {type: String, default: ''},
+        physicalHomeAddress: {type: String, default: ''},
+        homeTelephone: {type: String, default: ''},
+        officeTelephone: {type: String, default: ''},
+        mobileNo: {type: String, default: ''},
+        email: {type: String, default: ''},
+    },
+    nextOfKin: {
+        fullName: {type: String, default: ''},
+        relationShip: {type: String, default: ''},
+        idNo: {type: String, default: ''},
+        telephoneNo: {type: String, default: ''},
+        postalAddress: {type: String, default: ''},
+    },
+    beneficiaryOfPersonalAcc: {
+        fullName: {type: String, default: ''},
+        relationShip: {type: String, default: ''},
+        idNo: {type: String, default: ''},
+        telephoneNo: {type: String, default: ''},
+        postalAddress: {type: String, default: ''},
+    },
+
+    dependant: [{
+        surname: { type: String, default: '' },
+        title: { type: String, default: '' },
+        firstName: { type: String, default: '' },
+        otherName: { type: String, default: '' },
+        gender: { type: String, default: '' },
+        pinNo: { type: String, default: '' },
+        dateOfBirth: {type: Date, default: new Date()},
+        maritialStatus: { type: String, default: '' },
+        height: { type: String, default: '' },
+        weight: { type: String, default: '' },
+        occupation: { type: String, default: '' },
+        relationToApplicant: { type: String, default: '' },
+        photograph: { type: String, default: '' }, //image
+    }],
+
+    premiumComputation: {type:JSON,default:''},
+
+    previousMembership: {
+        principalName: {type: String, default: ''},
+        fromDate: {type: Date, default: new Date()},
+        toDate:{type: Date, default: new Date()},
+        spouseName: {type: String, default: ''},
+        spouseFromDate:{type: Date, default: new Date()},
+        spouseToDate: {type: Date, default: new Date()},
+        isDeclined: {type: Boolean, default: false},
+        declinedExtraInfo: {type: String, default: ''},
+        isLodgedClaim: {type: String, default: ''},
+        lodgedClaimExtraDetails: {type: String, default: ''},
+    },
+
+    confidentialMedicalHistory: {
+        applicantsHealthData: [
+            {
+                questionNo: {type: String, default: ''},
+                bloodDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                cancer: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                cardiovascular: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                earNoseDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                endocrinedisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            }, {
+                questionNo: {type: String, default: ''},
+                eyeRelatedDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                genitoUrinary: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                gastroIntestinal: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                gynecologicalAndObstetrical: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                musculoSkeletal: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                neurologicalDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                psychologicalDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                respiratoryDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                skinDisorders: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                stateWhether: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                sexualTransmitted: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                HivAids: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                hereditary: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                dentalTreatment: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                specializedTreatment: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },{
+                questionNo: {type: String, default: ''},
+                medication: {type: String, default: ''},
+                dependantHealthStatus:{type: Array, default: []},
+            },
+        ],
+        medicationExtraDetails: [{
+            applicant: {type: String, default: ''},
+            prescribedMedication: {type: String, default: ''},
+            diagnosis: {type: String, default: ''},
+            startDate: {type: Date, default: new Date()},
+        }],
+        medicalHistoryExtraDetails: [{
+            questionNo: {type: String, default: ''},
+            applicantName: {type: String, default: ''},
+            date:{type: Date, default: new Date()},
+            diagnosis: {type: String, default: ''},
+            treatment: {type: String, default: ''},
+            consultingDoctor: {type: String, default: ''},
+            telephoneOrAddress: {type: String, default: ''},
+        }],
+    },
+    surgeryAndHospitalAdmissions: [{
+        applicant: {type: String, default: ''},
+        surgicalProcedure: {type: String, default: ''},
+        date: {type: String, default: ''},
+        diagnosis: {type: String, default: ''},
+        treatment: {type: String, default: ''},
+        consultingDoctor: {type: String, default: ''},
+        telephoneOrAddress: {type: String, default: ''},
+    }],
+    signatures: {
+        memberSignature: {type: String, default: ''}, //image
+        spouseSignature: {type: String, default: ''}, //image
+        signatureDate: {type: Date, default: new Date()},
+    },
+    intermediaryDetails: {
+        fullName: {type: String, default: ''},
+        tradingUs: {type: String, default: ''},
+        telephoneNo: {type: String, default: ''},
+        pinNo: {type: String, default: ''},
+        email: {type: String, default: ''},
+        signatureOfIntermediary: {type: String, default: ''}, //image
+        date: {type: Date, default: new Date()},
+        unitManagerName: {type: String, default: ''},
+        bdmName: {type: String, default: ''},
+    },
+    policyCommencement: {
+        date: {type: Date, default: new Date()},
+    },
+    is_deleted: { type: Boolean, default: false }
+}, schemaOptions);
+
+health_insurance_kycSchema.plugin(autopopulate);
+
+health_insurance_kycSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('health_insurance_kyc', health_insurance_kycSchema);

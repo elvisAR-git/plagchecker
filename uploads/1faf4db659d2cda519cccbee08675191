@@ -1,0 +1,32 @@
+'use strict';
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+var autopopulate = require('mongoose-autopopulate');
+
+var schemaOptions = {
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    timestamps: {createdAt: 'create_date', updatedAt: 'last_updated'}
+};
+
+var categoryInputFieldsSchema = new Schema({
+    category_id:{type: Schema.Types.ObjectId, ref: 'ProductCategory', autopopulate:true},
+    banner:{type: String,default:null},
+    controls: [
+        {
+            input_type:{type: String, default: null},
+            input_name:{type: String, default: null},
+            input_caption:{type: String, default: null},
+            value:{type: String, default: null},
+            is_mandatory: { type: Boolean, default: false },
+        }
+    ],
+    is_deleted: { type: Boolean, default: false },
+}, schemaOptions);
+
+categoryInputFieldsSchema.plugin(autopopulate);
+
+categoryInputFieldsSchema.pre('save', function (next) { this.last_updated = new Date(); if (!this.isNew) { return next(); } next(); });
+
+module.exports = mongoose.model('category_input_fields', categoryInputFieldsSchema);

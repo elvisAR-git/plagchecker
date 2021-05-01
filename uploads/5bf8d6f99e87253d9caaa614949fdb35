@@ -1,0 +1,10 @@
+amount = 0
+principal = 4852
+intrest = 0.12
+total_time = 5
+
+# code
+
+amount = principal*(1 + intrest * total_time)
+
+print(amount)

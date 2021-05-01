@@ -1,0 +1,357 @@
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/client/css/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <style type="text/css">
+    .navbar {
+      background-color: #563d7c;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    .navbar-default .navbar-nav li a {
+      color: #eee;
+    }
+
+    .navbar-default .navbar-nav li a:hover {
+      color: white;
+    }
+
+    th,
+    td {
+      text-align: center;
+    }
+
+    thead {
+      background-color: #e57373;
+      color: white;
+    }
+
+    .error {
+      border: solid 1px rgba(128, 128, 128, 0.61);
+      border-radius: 20px;
+      background-color: rgb(250, 250, 253);
+      color: rgb(126, 7, 7);
+      margin-right: 5px;
+      margin-left: 5px;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      font-weight: normal;
+    }
+
+    #username {
+      color: white;
+      float: right;
+    }
+  </style>
+</head>
+
+
+<body>
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <ul class="nav navbar-nav">
+        <li><a href="/"><b>Home</b></a></li>
+        <li><a href="/events"><b>Events</b></a></li>
+        <li><a href="/addEvent"><b>Add Event</b></a></li>
+        <li><a href="/stock"><b>Stock Page</b></a></li>
+        <li><a href="/admin"><b>Admin</b></a></li>
+        <li><a href="/logout">
+            <span class="glyphicon glyphicon-log-out" aria-hidden="true"></span>
+          </a></li>
+      </ul>
+      <p id="userName">Welcome</p>
+    </div>
+  </nav>
+  <br><br>
+  <div id="emptyFieldErrorMessage" style="display:none; text-align: center;" class="error">
+    <br />
+    <b style="color: red; text-align: center">Error: Missing required information!</b>
+    <br />
+  </div>
+
+  <div id="sameLoginMessage" style="visibility: hidden; text-align: center;">
+    <br />
+    <b style="color: red; text-align: center">Error: This login is used by another user!</b>
+    <br />
+  </div>
+
+  <div id="deleteErrorMessage" style="visibility: hidden; text-align: center;">
+    <br />
+    <b style="color: red; text-align: center">Error: Cannot delete logged in user!</b>
+    <br />
+  </div>
+
+  <div class="container">
+    <button type="button" id="btnAdd" class="btn btn-default btn-sm">
+      <span class="glyphicon glyphicon-plus"></span> Add User
+    </button>
+
+    <br />
+    <br />
+
+    <table class="table table-striped table-bordered" id="tblData">
+
+      <thead>
+        <tr>
+          <th scope="col">Id</th>
+          <th scope="col">Name</th>
+          <th scope="col">Login</th>
+          <th scope="col">New Password</th>
+          <th></th>
+        </tr>
+      </thead>
+
+      <tbody>
+      </tbody>
+
+    </table>
+
+    &copy; 2020 Yang He, Ruofeng Liu, and Dan Challou.
+    Do not use, copy, redistribute this page or any portion of its contents, or remove this notice without the express
+    written
+    consent of the authors. Violation of this copyright is plagarism and will result in a failing grade
+  </div>
+
+  <script type="text/javascript">
+    // binds the add button to addFun
+    // populates the list of all existing users
+    $(function () {
+
+      $.get("userLogin").done(function (response) {
+
+        if (response.login != undefined) {
+          document.getElementById("userName").innerHTML = "Welcome " + response.login + "!";
+        } else {
+          window.location = "/login"
+        }
+      });
+      $("#btnAdd").bind("click", addUser);
+
+      // fetches the list of all users by hitting getUsers API of server
+      // dynamically appends the list of users to the table
+      $.get('/api/getListOfUsers').done(function (response) {
+        var output = "";
+        for (let user of response)
+          $('#tblData tbody').append(newUserRowInTable(user.acc_id, user.acc_name, user.acc_login));
+      });
+    });
+
+    // creates a table row for a specific user
+    // takes user's id, name, and login name as arguments
+    function newUserRowInTable(id, name, login) {
+      let updateBtn = $('<span></span>')
+        .attr('class', 'btnEdit glyphicon glyphicon-pencil')
+        .click(editUser(id, name, login, ''));
+      let deleteBtn = $('<span></span>')
+        .attr('class', 'btnDelete glyphicon glyphicon-trash')
+        .click(deleteUser(login));
+
+      let row = $('<tr></tr>')
+        .append(`<td>${id}</td>`)
+        .append(`<td>${name}</td>`)
+        .append(`<td>${login}</td>`)
+        .append('<td></td>')
+        .append($('<td></td>').append(updateBtn).append('&emsp;').append(deleteBtn));
+
+      return row;
+    }
+
+    // function to add a new user
+    // this function internally calls saveUser() to save the details of the new user
+    function addUser() {
+      let saveBtn = $('<span></span>')
+        .attr('class', 'btnSave glyphicon glyphicon-floppy-save')
+        .click(saveUser('insert'));
+      let cancelBtn = $('<span></span>')
+        .attr('class', 'btnCancel glyphicon glyphicon-remove')
+        .click(cancelUserAdd());
+
+      let row = $('<tr></tr>')
+        .append('<td></td>')
+        .append(`<td><input type='text' /></td>`)
+        .append(`<td><input type='text' /></td>`)
+        .append(`<td><input type='text' /></td>`)
+        .append($('<td></td>').append(saveBtn).append('&emsp;').append(cancelBtn));
+
+      $('#tblData tr:last').after(row);
+    }
+
+    // removes the newly added row from the HTML table
+    function cancelUserAdd() {
+      return function () {
+        $(this).parent().parent().remove();
+        $('#sameLoginMessage').css('visibility', 'hidden');
+        $('#emptyFieldErrorMessage').hide();
+      }
+    }
+
+    // function to exit the details of an existing user
+    // this function internally calls saveUser() to update the details of an existing user
+    function editUser(old_id, old_name, old_login, old_password) {
+      return function () {
+        let tr = $(this).parent().parent(),
+          tds = tr.children();
+        let tdName = tds[1],
+          tdLogin = tds[2],
+          tdPassword = tds[3],
+          tdBtns = tds[4];
+
+        let saveBtn = $('<span></span>')
+          .attr('class', 'btnSave glyphicon glyphicon-floppy-save')
+          .click(saveUser('update'));
+        let undoBtn = $('<span></span>')
+          .attr('class', 'btnUndo glyphicon glyphicon-refresh')
+          .click(undoUserUpdate(old_id, old_name, old_login, old_password, $(tdBtns).clone(true)));
+
+        $(tdName).replaceWith($(`<td><input type='text' id='txtName' value='${$(tdName).text()}'></td>`));
+        $(tdLogin).replaceWith($(`<td><input type='text' id='txtLogin' value='${$(tdLogin).text()}'></td>`));
+        $(tdPassword).replaceWith($(`<td><input type='text' id='txtPassword' value='${$(tdPassword).text()}'></td>`));
+        $(tdBtns).replaceWith($('<td></td>').append(saveBtn).append('&emsp;').append(undoBtn));
+      }
+    }
+
+    // reverts back the changes done during edit
+    function undoUserUpdate(old_id, old_name, old_login, old_password, old_btns) {
+      return function () {
+        let tr = $(this).parent().parent(),
+          tds = tr.children();
+        let tdId = tds[0],
+          tdName = tds[1],
+          tdLogin = tds[2],
+          tdPassword = tds[3],
+          tdBtns = tds[4];
+
+        $(tdId).html(old_id);
+        $(tdName).html(old_name);
+        $(tdLogin).html(old_login);
+        $(tdPassword).html(old_password);
+        $(tdBtns).replaceWith(old_btns);
+
+        $('#sameLoginMessage').css('visibility', 'hidden');
+        $('#emptyFieldErrorMessage').hide();
+      }
+    }
+
+    // this function can be called in two modes: 1. Insert 2. Update
+    // Insert mode: Add a new user by calling addUser API of server
+    // Update mode: Updates the details of an existing user by calling updateUser API of server
+    function saveUser(mode) {
+      return function () {
+        let tr = $(this).parent().parent(),
+          tds = tr.children();
+        let tdId = tds[0],
+          tdName = tds[1],
+          tdLogin = tds[2],
+          tdPassword = tds[3];
+        let valId = $(tdId).html(),
+          valName = $(tdName).children('input').val(),
+          valLogin = $(tdLogin).children('input').val(),
+          valPassword = $(tdPassword).children("input").val();
+
+        if (mode == 'insert') {
+          // Check if name, login, or password is empty
+          let emptyMessage = [];
+          if (!valName)
+            emptyMessage.push('Name field is required. ');
+          if (!valLogin)
+            emptyMessage.push('Login field is required. ');
+          if (!valPassword)
+            emptyMessage.push('Password field is required. ');
+
+          emptyMessage = emptyMessage.join(' <br> ');
+          if (emptyMessage) {
+            emptyMessage = `Error: missing required information. <br> ${emptyMessage}`;
+            $('#emptyFieldErrorMessage').children('b').html(emptyMessage);
+            $('#emptyFieldErrorMessage').show();
+            return;
+          } else {
+            $('#emptyFieldErrorMessage').hide();
+          }
+
+          // call the API to add the details of a new user
+          $.post("/api/addUser", {
+            acc_name: valName,
+            acc_login: valLogin,
+            acc_password: valPassword
+          }).done(function (data) {
+            if (data.flag == true) {
+              // no other user exists with the login entered by user
+              tr.replaceWith(newUserRowInTable(
+                data.acc_id, $(tdName).children('input').val(), $(tdLogin).children('input').val()
+              ));
+              $('#sameLoginMessage').css('visibility', 'hidden');
+              $('#deleteErrorMessage').css('visibility', 'hidden');
+            } else {
+              // some other user exists with the login entered by user
+              $('#sameLoginMessage').css('visibility', 'visible');
+            }
+          });
+        } else if (mode == 'update') {
+          // Check if name or login is empty
+          let emptyMessage = [];
+          if (!valName)
+            emptyMessage.push('Name field is required. ');
+          if (!valLogin)
+            emptyMessage.push('Login field is required. ');
+
+          emptyMessage = emptyMessage.join(' <br> ');
+          if (emptyMessage) {
+            emptyMessage = `Error: missing required information. <br> ${emptyMessage}`;
+            $('#emptyFieldErrorMessage').children('b').html(emptyMessage);
+            $('#emptyFieldErrorMessage').show();
+            return;
+          } else {
+            $('#emptyFieldErrorMessage').hide();
+          }
+
+          // call the API to update the details of an existing user
+          $.post("/api/updateUser", {
+            acc_id: valId,
+            acc_name: valName,
+            acc_login: valLogin,
+            acc_password: valPassword
+          }).done(function (data) {
+            if (data.flag == true) {
+              // no other user exists with the login entered by user
+              tr.replaceWith(newUserRowInTable(
+                $(tdId).text(), $(tdName).children('input').val(), $(tdLogin).children('input').val()
+              ));
+              $('#sameLoginMessage').css('visibility', 'hidden');
+              $('#deleteErrorMessage').css('visibility', 'hidden');
+            } else {
+              // some other user exists with the login entered by user
+              $('#sameLoginMessage').css('visibility', 'visible');
+            }
+          });
+        }
+      }
+    }
+
+    // function to delete an user
+    // calls the deleteUser API of server
+    function deleteUser(login) {
+      return function () {
+        let userRow = $(this).parent().parent();
+
+        $.post("/api/deleteUser", {
+          acc_login: login
+        }).done(function (data) {
+          if (data.flag == true) {
+            $('#sameLoginMessage').css('visibility', 'hidden');
+            $('#deleteErrorMessage').css('visibility', 'hidden');
+            $('#emptyFieldErrorMessage').hide();
+            userRow.remove();
+          } else {
+            $('#deleteErrorMessage').css('visibility', 'visible');
+          }
+        });
+      };
+    }
+  </script>
+</body>
+
+</html>

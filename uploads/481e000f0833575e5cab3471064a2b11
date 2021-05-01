@@ -1,0 +1,58 @@
+# This array will hold all the command line arguments passed by the user
+allParams=()
+
+RED='\033[0;31m'
+NORMAL='\033[0m'
+GREEN='\033[1;32m'
+
+# loop though the array of arguments
+for param in "$@" 
+do
+    # Check if value is null or empty and exclude it
+    if [$value != ""] 
+    then
+    # append value to array
+    allParams+=($param)
+    fi
+done
+
+# If there are no arguments passed to the program, raise an error and exit
+if [[ ${#allParams[@]} -eq 0 ]]; then
+    echo -e "${RED}[!] No arguments passed, please pass command-line arguments to proceed :-)"
+    exit 1
+fi
+
+
+echo "______________________________________________________________________________________"
+echo "
+[+] Hello! This program will save the command-line arguments you've passed above to a file!"
+
+echo "................................................"
+
+# Prompt for filename
+read -p "[*] Enter the filename to save arguments: " fileName
+
+
+# Check if user suplied empty filename
+if [ -z $fileName ]; then
+    # Raise error and exit
+    echo -e "${RED}[!] Invalid filename"
+    exit 1
+fi
+
+
+
+# check if similar file exists
+if [ -f "$fileName" ]; then
+    # Raise error and quit program
+    echo -e "${RED}[!] A file with the name '$fileName' already exists in this directory!"
+    exit 1
+fi
+
+# loop through all arguments and append them to the file
+for value in ${allParams[@]}; do
+  echo $value >> $fileName
+done
+
+# program finished!
+echo -e "${GREEN}[+] Done! file saved to '$fileName'"
