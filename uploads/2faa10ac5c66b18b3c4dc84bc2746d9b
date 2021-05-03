@@ -1,6 +1,0 @@
-const express = require("express");
-const Router = express.Router();
-const Controller = require("./carsController");
-//  index admin login page
-Router.get("", Controller.index);
-module.exports = Router;

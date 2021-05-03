@@ -1,4 +1,5 @@
 let report = {}
+var icons = window.FileIcons;
 
 document.addEventListener('DOMContentLoaded', function () {
     var elems = document.querySelectorAll('.modal');
@@ -111,7 +112,7 @@ function showReport() {
 
 
             }
-            li.innerHTML = `<i class="material-icons circle">description</i>
+            li.innerHTML = `<i class="${icons.getClass(file.dump.originalname)} circle"></i>
             
             <div class="col s8">
                 <div class="progress grey lighten-3">
@@ -120,45 +121,45 @@ function showReport() {
             <div>
             
             <span class="badge blue grey-text lighten-5">${similarities.similarities.length} similarlities</span>
-            <span class="badge title">${file.dump.originalname}</span>
+            <span class="badge title text-lighten-3 teal-text">${file.dump.originalname}</span>
             <a href="compare/${report._id}/${file._id}" class="secondary-content btn btn-flat blue white-text waves-effect waves-light">compare</a>`
-            // li.classList.add('collection-item')
+            li.classList.add('collection-item')
             li.classList.add('collection-item')
             li.classList.add('avatar')
             li.classList.add('tooltipped')
             li.setAttribute("data-position", "right")
             li.setAttribute("data-tooltip", `${Math.round(((safe_array.length * 100) / report.total))}% similar`)
-            // if (((safe_array.length * 100) / report.total) > 49 && ((safe_array.length * 100) / report.total) < 60)
-            // {
-            //     li.classList.add('pink')
-            //     li.classList.add('lighten-5')
-            // }
+            if (((safe_array.length * 100) / report.total) > 49 && ((safe_array.length * 100) / report.total) < 60)
+            {
+                li.classList.add('pink')
+                li.classList.add('lighten-5')
+            }
 
-            // if (((safe_array.length * 100) / report.total) > 59 && ((safe_array.length * 100) / report.total) < 70)
-            // {
-            //     li.classList.add('pink')
-            //     li.classList.add('lighten-4')
-            // }
-            // if (((safe_array.length * 100) / report.total) > 69)
-            // {
-            //     li.classList.add('pink')
-            //     li.classList.add('lighten-3')
-            // }
-            // if (((safe_array.length * 100) / report.total) > 29 && ((safe_array.length * 100) / report.total) < 50)
-            // {
-            //     li.classList.add('lime')
-            //     li.classList.add('lighten-5')
-            // }
-            // if (((safe_array.length * 100) / report.total) > 14 && ((safe_array.length * 100) / report.total) < 30)
-            // {
-            //     li.classList.add('light-green')
-            //     li.classList.add('lighten-5')
-            // }
+            if (((safe_array.length * 100) / report.total) > 59 && ((safe_array.length * 100) / report.total) < 70)
+            {
+                li.classList.add('pink')
+                li.classList.add('lighten-4')
+            }
+            if (((safe_array.length * 100) / report.total) > 69)
+            {
+                li.classList.add('pink')
+                li.classList.add('lighten-3')
+            }
+            if (((safe_array.length * 100) / report.total) > 29 && ((safe_array.length * 100) / report.total) < 50)
+            {
+                li.classList.add('yellow')
+                li.classList.add('lighten-5')
+            }
+            if (((safe_array.length * 100) / report.total) > 14 && ((safe_array.length * 100) / report.total) < 30)
+            {
+                li.classList.add('yellow')
+                li.classList.add('lighten-5')
+            }
             document.getElementById('similar-files').appendChild(li)
         });
     } else
     {
-        document.getElementById("similar-files").innerHTML = `<li class="collection-item">No files</li>`
+        document.getElementById("similar-files").innerHTML = `<div><i class="material-icons large">sentiment_satisfied</i><p>Nothing here</p></div>`
         document.getElementById("lines").innerText = "all lines are unique"
         document.getElementById("description").innerText = "No similar files found"
     }

@@ -25,6 +25,7 @@
 
     <!--Let browser know website is optimized for mobile-->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <style>
     .row {
@@ -37,114 +38,128 @@
     li {
       list-style-type: none;
     }
+    .circle {
+      /* background-color: rgb(226, 225, 225) !important; */
+      font-size: large !important;
+    }
     body {
       background-image: url("/img/background.png");
     }
+
     .collapsible-body {
       margin: 0 !important;
     }
     .collapsible {
       padding: 0;
     }
+    .large-font {
+      font-size: x-large;
+    }
   </style>
 
   <!--JavaScript at end of body for optimized loading-->
   <script type="text/javascript" src="js/materialize.js"></script>
+
+  <script src="js/file-icons.js"></script>
   <script src="/js/plag.js"></script>
 
   <body>
-    <div class="fixed-action-btn">
-      <a
-        href="#"
-        data-target="slide-out"
-        class="sidenav-trigger btn-floating blue btn-large"
-        ><i class="material-icons">menu</i></a
-      >
-    </div>
+    <%- include('header') %>
+    <main>
+      <div class="fixed-action-btn">
+        <a
+          href="#"
+          data-target="slide-out"
+          class="sidenav-trigger btn-floating blue btn-large"
+          ><i class="material-icons">menu</i></a
+        >
+      </div>
 
-    <div class="cont">
-      <div class="row">
-        <div class="sidenav col container" id="slide-out">
-          <br />
-          <a href="/" class="btn btn-large">Upload other files</a>
-          <p>Select file to view report</p>
-          <p class="grey-text">
-            <span class="red-text">*</span>Please note, some files may still be
-            in processing by the server
-          </p>
-          <div class="collection" id="list">
-            <% source_files.forEach(element => { %>
-            <a
-              class="collection-item avatar"
-              href="#"
-              id="<%=element.id%>"
-              onclick="fetchReport(this)"
-            >
-              <i class="material-icons circle green">description</i>
-              <span class="title"><%=element.file.originalname%></span>
-            </a>
+      <div class="cont">
+        <div class="row">
+          <div class="sidenav col container white-text" id="slide-out">
+            <br />
+            <a href="/" class="btn btn-large">Upload other files</a>
+            <p>Select file to view report</p>
+            <p class="grey-text">
+              <span class="red-text">*</span>Please note, some files may still
+              be in processing by the server
+            </p>
+            <div class="collection" id="list">
+              <% source_files.forEach(element => { %>
+              <a
+                class="collection-item waves-effect waves-light avatar"
+                href="#"
+                id="<%=element.id%>"
+                onclick="fetchReport(this)"
+                style="border: none"
+              >
+                <i class="material-icons circle green">description</i>
+                <span class="title"><%=element.file.originalname%></span>
+              </a>
 
-            <% }) %>
+              <% }) %>
+            </div>
+            <br />
+            <br />
+            <br />
+            <br />
           </div>
-          <br />
-          <br />
-          <br />
-          <br />
-        </div>
-        <div class="col s12 center cont">
-          <div class="" id="none">
-            <i class="material-icons white-text">info</i>
-            <p class="white-text">No file selected</p>
-          </div>
+          <div class="col s12 center cont">
+            <div class="" id="none">
+              <i class="material-icons white-text">info</i>
+              <p class="white-text">No file selected</p>
+            </div>
 
-          <!-- report -->
+            <!-- report -->
 
-          <div class="report hide center container" id="report">
-            <h5 id="unique" class="white-text"></h5>
-            <div class="row">
-              <div class="col s6 offset-s3">
-                <div class="progress center">
-                  <div class="determinate" id="progressbar"></div>
+            <div class="report hide center container" id="report">
+              <h5 id="unique" class="white-text"></h5>
+              <div class="row">
+                <div class="col s6 offset-s3">
+                  <div class="progress center">
+                    <div class="determinate" id="progressbar"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="row">
-              <div class="col s12">
-                <div class="">
-                  <ul class="collection collapsible white">
-                    <li>
-                      <div class="collapsible-header">
-                        <i class="material-icons medium">remove_red_eye</i>Show
-                        similar files
-                      </div>
-                      <div
-                        class="collapsible-body scrollable"
-                        id="similar-files"
-                      >
-                        <div class="collapsible-header">
-                          <i class="material-icons">description</i>Show files
+              <div class="row" style="border: none">
+                <div class="col s12" style="border: none">
+                  <div class="">
+                    <ul class="collection collapsible" style="border: none">
+                      <li>
+                        <div
+                          class="collapsible-header waves-effect waves-teal"
+                          style="border: none"
+                        >
+                          <i class="material-icons medium">remove_red_eye</i
+                          >Show similar files
                         </div>
-                      </div>
-                    </li>
-                  </ul>
-                  <br />
-                  <br />
-                  <br />
-                </div>
-
-                <div class="row">
-                  <div class="col s5">
-                    <div class="card-panel red">
-                      <span class="white-text" id="description"
-                        >No similar files found</span
-                      >
-                    </div>
+                        <div
+                          class="collapsible-body grey lighten-4 scrollable"
+                          id="similar-files"
+                          style="border: none; padding: 1rem; margin: 0"
+                        ></div>
+                      </li>
+                    </ul>
+                    <br />
+                    <br />
+                    <br />
                   </div>
-                  <div class="col s7">
-                    <div class="card-panel blue">
-                      <span class="white-text" id="lines"
-                        >all lines are unique</span
-                      >
+
+                  <div class="row">
+                    <div class="col s5">
+                      <div class="card-panel red">
+                        <span class="white-text" id="description"
+                          >No similar files found</span
+                        >
+                      </div>
+                    </div>
+                    <div class="col s7">
+                      <div class="card-panel blue">
+                        <span class="white-text" id="lines"
+                          >all lines are unique</span
+                        >
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -153,27 +168,28 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- modal -->
-    <br />
-    <div id="modal1" class="modal center">
-      <div class="modal-content">
-        <p>Processing, please wait...</p>
-        <div class="preloader-wrapper active" id="loader">
-          <div class="spinner-layer spinner-blue-only">
-            <div class="circle-clipper left">
-              <div class="circle"></div>
-            </div>
-            <div class="gap-patch">
-              <div class="circle"></div>
-            </div>
-            <div class="circle-clipper right">
-              <div class="circle"></div>
+      <!-- modal -->
+      <br />
+      <div id="modal1" class="modal center">
+        <div class="modal-content">
+          <p>Processing, please wait...</p>
+          <div class="preloader-wrapper active" id="loader">
+            <div class="spinner-layer spinner-blue-only">
+              <div class="circle-clipper left">
+                <div class="circle"></div>
+              </div>
+              <div class="gap-patch">
+                <div class="circle"></div>
+              </div>
+              <div class="circle-clipper right">
+                <div class="circle"></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
+    <%- include ('footer.ejs') %>
   </body>
 </html>

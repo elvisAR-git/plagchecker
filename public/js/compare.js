@@ -39,14 +39,16 @@ document.addEventListener('DOMContentLoaded', function () {
     xhr.send();
 })
 
-function smoothScroll(target) {
-    target.classList.remove("grey-text")
+function smoothScroll(event, target) {
+    target.classList.remove("pink-text")
     target.classList.add("blue-text")
+    target.classList.remove("text-lighten-1")
     window.target = target
     let t = target.id
     setTimeout(() => {
         document.getElementById(t).classList.remove("blue-text")
-        document.getElementById(t).classList.add("grey-text")
+        document.getElementById(t).classList.add("pink-text")
+        document.getElementById(t).classList.add("text-lighten-1")
     }, 4000)
 
     var scrollContainer = target;
@@ -56,8 +58,7 @@ function smoothScroll(target) {
         if (!scrollContainer) return;
         scrollContainer.scrollTop += 1;
     } while (scrollContainer.scrollTop == 0);
-
-    var targetY = -200;
+    var targetY = -280
     do
     { //find the top of target relatively to the container
         if (target == scrollContainer) break;
@@ -130,9 +131,10 @@ function loadCode() {
         span.innerText = `${index + 1} ${line}`
         if (plag_reference_lines.includes(index + 1))
         {
-            span.classList.add("grey-text")
-            span.classList.add("grey")
-            span.classList.add("lighten-5")
+            span.classList.add("pink-text")
+            span.classList.add("text-lighten-1")
+            span.classList.add("lime")
+            span.classList.add("lighten-4")
             span.setAttribute("id", `ref${index + 1}`)
 
         } else
@@ -141,7 +143,6 @@ function loadCode() {
         }
 
         document.getElementById("reference_file").appendChild(span)
-        document.getElementById("reference_file").appendChild(document.createElement("hr"))
         index += 1
     });
 
@@ -159,22 +160,15 @@ function loadCode() {
             span.classList.add('tooltipped')
             span.setAttribute("data-position", "right")
 
-            span.setAttribute("onclick", `smoothScroll(document.getElementById("ref" + ${getMatchRefLine(index, target_objs).palgLine}))`)
-            span.setAttribute("data-tooltip", `<p class="white-text darken-3">Matches line ${getMatchRefLine(index, target_objs).palgLine} of ${stateObj.reference_file.dump.originalname}<p><hr class="white">
-            <code>
-                ${getTextRange(getMatchRefLine(index, target_objs).palgLine - 5, getMatchRefLine(index, target_objs).palgLine - 1, stateObj.reference_file_raw)}
-            <br>
-            <span class="red-text">
-                ${escapeHtml(getMatchRefLine(index, target_objs).text)}
-            </span>
-            <span>${getTextRange(getMatchRefLine(index, target_objs).palgLine, getMatchRefLine(index, target_objs).palgLine + 4, stateObj.reference_file_raw)}<code>`)
+            span.setAttribute("onclick", `smoothScroll(this,document.getElementById("ref" + ${getMatchRefLine(index, target_objs).palgLine}))`)
+            span.setAttribute("data-tooltip", `<p class="white-text darken-3 small">Matches line ${getMatchRefLine(index, target_objs).palgLine} of ${stateObj.reference_file.dump.originalname}<p><hr class="white">
+            <pre><code>${getTextRange(getMatchRefLine(index, target_objs).palgLine - 5, getMatchRefLine(index, target_objs).palgLine - 1, stateObj.reference_file_raw)}<br>${escapeHtml(getMatchRefLine(index, target_objs).text)}${getTextRange(getMatchRefLine(index, target_objs).palgLine, getMatchRefLine(index, target_objs).palgLine + 4, stateObj.reference_file_raw)}<code></pre>`)
         } else
         {
             span.classList.add("grey-text")
         }
         document.getElementById("target_file").appendChild(span)
 
-        document.getElementById("target_file").appendChild(document.createElement("hr"))
         index += 1
     });
 

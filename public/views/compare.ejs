@@ -25,49 +25,63 @@
 
     <!--Let browser know website is optimized for mobile-->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/mine.css" />
+    <script src="/js/file-icons.js"></script>
+    <link
+      rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/default.min.css"
+    />
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/highlight.min.js"></script>
   </head>
 
   <body>
-    <div class="center">
-      <br />
-      <div class="preloader-wrapper big active" id="loader">
-        <div class="spinner-layer spinner-blue-only">
-          <div class="circle-clipper left">
-            <div class="circle"></div>
-          </div>
-          <div class="gap-patch">
-            <div class="circle"></div>
-          </div>
-          <div class="circle-clipper right">
-            <div class="circle"></div>
+    <script>
+      hljs.initHighlightingOnLoad();
+    </script>
+    <%- include ('header') %>
+    <main>
+      <div class="center">
+        <div class="preloader-wrapper big active" id="loader">
+          <div class="spinner-layer spinner-blue-only">
+            <div class="circle-clipper left">
+              <div class="circle"></div>
+            </div>
+            <div class="gap-patch">
+              <div class="circle"></div>
+            </div>
+            <div class="circle-clipper right">
+              <div class="circle"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="main">
-      <div class="row">
-        <div class="col s6 card grey lighten-5 left-align scrollable">
-          <p>
-            <%= target_file.dump.originalname %> | <%=
-            Math.round(target_file.dump.size/1024) %>KB
-          </p>
-          <code class="" id="target_file"></code>
+      <div class="main">
+        <div class="row">
+          <div class="col s6 card grey lighten-5 left-align">
+            <p>
+              <%= target_file.dump.originalname %> | <%=
+              Math.round(target_file.dump.size/1024) %>KB
+            </p>
+            <pre><code class="scrollable" id="target_file"></code></pre>
+          </div>
+          <div class="col s6 card-panel grey lighten-3 left-align">
+            <p>
+              <%=reference_file.dump.originalname%> | <%=
+              Math.round(reference_file.dump.size/1024) %>KB
+            </p>
+            <pre><code class="scrollable" id="reference_file"></code></pre>
+          </div>
         </div>
-        <div class="col s6 card-panel grey lighten-3 left-align scrollable">
-          <p>
-            <%=reference_file.dump.originalname%> | <%=
-            Math.round(reference_file.dump.size/1024) %>KB
-          </p>
-          <code id="reference_file"></code>
-        </div>
-      </div>
 
-      <div class="fixed-action-btn">
-        <a class="btn-floating btn-large blue" onclick="back()">
-          <i class="large material-icons">chevron_left</i>
-        </a>
+        <div class="fixed-action-btn">
+          <a class="btn-floating btn-large blue" onclick="back()">
+            <i class="large material-icons">chevron_left</i>
+          </a>
+        </div>
       </div>
-    </div>
+    </main>
+    <%- include ('footer.ejs') %>
     <script type="text/javascript" src="/js/materialize.js"></script>
     <script type="text/javascript" src="/js/compare.js"></script>
   </body>

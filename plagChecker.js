@@ -33,61 +33,68 @@ module.exports = async function plagchecker(fileIn) {
         // ooops! gotta make sure we aren't comparing the file to itself :-)
         if (file._id != fileIn._id)
         {
-            let result = await readFile("./uploads/" + file.name)
+            try
+            {
+                let result = await readFile("./uploads/" + file.name)
+                // read the target file and reference file from memory :-) and parse them into an array of lines
 
-            // read the target file and reference file from memory :-) and parse them into an array of lines
+                let uploaded_file_lines = uploaded_file.split("\n");
 
-            let uploaded_file_lines = uploaded_file.split("\n");
+                let file_lines = result.toString('utf-8').split("\n");
 
-            let file_lines = result.toString('utf-8').split("\n");
+                let sourceLine = 1
 
-            let sourceLine = 1
-
-            // loop through each of the target lines comparing them to the refrence lines atr diffrent legths
-            uploaded_file_lines.forEach(line1 => {
-                let palgLine = 1
-                file_lines.forEach(line2 => {
-                    // check if neither of the lines are null and that the target line has alphabets
-                    if (line2 != '' && line1 != '' && regExp.test(line1))
-                    {
-                        let similarity = stringSimilarity.compareTwoStrings(line1, line2);
-                        if (similarity >= minimum_similarity)
+                // loop through each of the target lines comparing them to the refrence lines atr diffrent legths
+                uploaded_file_lines.forEach(line1 => {
+                    let palgLine = 1
+                    file_lines.forEach(line2 => {
+                        // check if neither of the lines are null and that the target line has alphabets
+                        if (line2 != '' && line1 != '' && regExp.test(line1))
                         {
-                            // some jargon to sample the text
-
-                            if (!someArray.includes(file._id))
+                            let similarity = stringSimilarity.compareTwoStrings(line1, line2);
+                            if (similarity >= minimum_similarity)
                             {
-                                let simObj = {};
-                                simObj.file = file._id
-                                simObj.similarities = []
-                                analysis.push(simObj)
-                                someArray.push(file._id);
-                            }
+                                // some jargon to sample the text
 
-                            index = analysis.findIndex((obj => obj.file == file._id))
-                            analysis[index].similarities.push({
-                                line1,
-                                line2,
-                                similarity,
-                                sourceLine,
-                                palgLine
-                            })
-                            var plag_line = {
-                                number: sourceLine,
-                                line: line1
-                            }
-                            if (!plagiarised_lines.some(el => el.number === plag_line.number))
-                            {
-                                plagiarised_lines.push(plag_line)
-                            }
+                                if (!someArray.includes(file._id))
+                                {
+                                    let simObj = {};
+                                    simObj.file = file._id
+                                    simObj.similarities = []
+                                    analysis.push(simObj)
+                                    someArray.push(file._id);
+                                }
 
+                                index = analysis.findIndex((obj => obj.file == file._id))
+                                analysis[index].similarities.push({
+                                    line1,
+                                    line2,
+                                    similarity,
+                                    sourceLine,
+                                    palgLine
+                                })
+                                var plag_line = {
+                                    number: sourceLine,
+                                    line: line1
+                                }
+                                if (!plagiarised_lines.some(el => el.number === plag_line.number))
+                                {
+                                    plagiarised_lines.push(plag_line)
+                                }
+
+                            }
                         }
-                    }
-                    palgLine += 1
-                });
-                sourceLine += 1
+                        palgLine += 1
+                    });
+                    sourceLine += 1
 
-            });
+                });
+            } catch (error)
+            {
+
+            }
+
+
         }
 
     }

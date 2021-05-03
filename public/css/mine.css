@@ -1,11 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&family=Rubik:wght@500&display=swap');
 
-* {
+body {
     font-family: 'Noto Sans HK', sans-serif;
+}
+
+.icon span {
+    font-family: 'Rubik', sans-serif;
 }
 
 code {
     font-family: monospace !important;
+}
+
+#fileList li {
+    /* height: 3vw !important; */
+    font-size: medium;
+    font-weight: bolder;
 }
 
 nav {
@@ -13,12 +24,45 @@ nav {
     z-index: 4;
 }
 
+.title {
+    font-family: 'Poppins', sans-serif;
+    font-size: larger;
+}
+
 .container {
     padding: 1rem;
 }
 
+
 body {
     background-image: url("/img/background.png");
+    background-position: top 30%;
+    background-repeat: repeat;
+    background-position: top left;
+    background-size: 180%;
+}
+
+.sidenav {
+    background-color: rgb(91, 91, 91) !important;
+}
+
+.theme {
+    background-color: rgb(91, 91, 91) !important;
+}
+
+.page-footer {
+    background-color: rgb(91, 91, 91) !important;
+    margin-top: .5rem;
+}
+
+body {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+}
+
+main {
+    flex: 1 0 auto;
 }
 
 .file {
@@ -32,8 +76,53 @@ label {
     cursor: pointer !important;
 }
 
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+
+
+
+code {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: larger;
+}
+
+.main {
+    margin: 2rem;
+}
+
+.material-tooltip {
+    text-align: left;
+}
+
+.blurry-text {
+    color: transparent;
+    filter: blur(1px);
+    -webkit-filter: blur(2px)
+}
+
+code small {
+    cursor: pointer !important;
+}
+
+
+code hr {
+    height: 1px;
+    color: #86848420;
+    background-color: #86848420;
+    border: none;
+}
+
 .scrollable {
-    overflow-y: scroll;
-    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-x: auto;
     max-height: 500px;
+}
+
+.scrollable:-webkit-scrollbar {
+    width: 1em;
+}
+
+.scrollable::-webkit-scrollbar-thumb {
+    background-color: rgb(91, 91, 91) !important;
+    outline: 1px solid slategrey;
 }
