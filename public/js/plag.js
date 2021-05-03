@@ -3,6 +3,15 @@ let report = {}
 document.addEventListener('DOMContentLoaded', function () {
     var elems = document.querySelectorAll('.modal');
     var instances = M.Modal.init(elems);
+
+
+    var side_nav = document.querySelectorAll('.sidenav');
+
+    let nav = M.Sidenav.init(side_nav);
+    nav[0].open()
+
+    var elems_collapsible = document.querySelectorAll('.collapsible');
+    M.Collapsible.init(elems_collapsible);
 });
 
 
@@ -119,32 +128,32 @@ function showReport() {
             li.classList.add('tooltipped')
             li.setAttribute("data-position", "right")
             li.setAttribute("data-tooltip", `${Math.round(((safe_array.length * 100) / report.total))}% similar`)
-            if (((safe_array.length * 100) / report.total) > 49 && ((safe_array.length * 100) / report.total) < 60)
-            {
-                li.classList.add('pink')
-                li.classList.add('lighten-5')
-            }
+            // if (((safe_array.length * 100) / report.total) > 49 && ((safe_array.length * 100) / report.total) < 60)
+            // {
+            //     li.classList.add('pink')
+            //     li.classList.add('lighten-5')
+            // }
 
-            if (((safe_array.length * 100) / report.total) > 59 && ((safe_array.length * 100) / report.total) < 70)
-            {
-                li.classList.add('pink')
-                li.classList.add('lighten-4')
-            }
-            if (((safe_array.length * 100) / report.total) > 69)
-            {
-                li.classList.add('pink')
-                li.classList.add('lighten-3')
-            }
-            if (((safe_array.length * 100) / report.total) > 29 && ((safe_array.length * 100) / report.total) < 50)
-            {
-                li.classList.add('lime')
-                li.classList.add('lighten-5')
-            }
-            if (((safe_array.length * 100) / report.total) > 14 && ((safe_array.length * 100) / report.total) < 30)
-            {
-                li.classList.add('light-green')
-                li.classList.add('lighten-5')
-            }
+            // if (((safe_array.length * 100) / report.total) > 59 && ((safe_array.length * 100) / report.total) < 70)
+            // {
+            //     li.classList.add('pink')
+            //     li.classList.add('lighten-4')
+            // }
+            // if (((safe_array.length * 100) / report.total) > 69)
+            // {
+            //     li.classList.add('pink')
+            //     li.classList.add('lighten-3')
+            // }
+            // if (((safe_array.length * 100) / report.total) > 29 && ((safe_array.length * 100) / report.total) < 50)
+            // {
+            //     li.classList.add('lime')
+            //     li.classList.add('lighten-5')
+            // }
+            // if (((safe_array.length * 100) / report.total) > 14 && ((safe_array.length * 100) / report.total) < 30)
+            // {
+            //     li.classList.add('light-green')
+            //     li.classList.add('lighten-5')
+            // }
             document.getElementById('similar-files').appendChild(li)
         });
     } else
