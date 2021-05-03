@@ -21,7 +21,7 @@ module.exports = async function plagchecker(fileIn) {
 
     var regExp = /[a-zA-Z]/g;
     // above: regex for alphabetics
-    // why you ask? so that the lagorithm makes sure that each line it compares has at least one letter :-)
+    // why you ask? so that the algorithm makes sure that each line it compares has at least one letter :-)
 
 
     let plagiarised_lines = []
