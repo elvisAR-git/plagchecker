@@ -15,27 +15,27 @@ function fetchReport(target) {
     xhr.onload = function () {
         if (this.status == 200)
         {
-            try
-            {
-                report = JSON.parse(this.response)
-            } catch (error)
-            {
-
-            }
             instance.close()
             if (this.response)
             {
+                if (JSON.parse(this.response).isError)
+                {
+                    M.toast({
+                        html: JSON.parse(this.response).message,
+                        classes: "orange white-text"
+                    })
+                    return
+
+                } else
+                {
+                    report = JSON.parse(this.response).file
+                    console.log(report)
+                }
                 M.toast({
                     html: `Loaded ${report.dump.originalname}`,
                     classes: "green rounded"
                 })
                 showReport()
-            } else
-            {
-                M.toast({
-                    html: 'Processing file, try again later',
-                    classes: "orange white-text"
-                })
             }
         }
     };

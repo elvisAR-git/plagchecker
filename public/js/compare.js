@@ -22,11 +22,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (this.response)
             {
+                loadCode()
                 M.toast({
                     html: "Successfully loaded!",
                     classes: "green white-text"
                 })
-                loadCode()
             } else
             {
                 M.toast({
@@ -93,16 +93,6 @@ function escapeHtml(unsafe) {
 }
 
 function getTextRange(from, to, list) {
-    // if (list.includes("</") && list.includes(">"))
-    // {
-    //     let text = ''
-    //     list = list.slice(from, to)
-
-    //     list.forEach(element => {
-    //         text += "<br>" + `<span class="white-text blurry-text">` + escapeHtml(element) + "</span>"
-    //     });
-    //     return text
-    // }
     let text = ''
     list = list.slice(from, to)
 

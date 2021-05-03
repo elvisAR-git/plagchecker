@@ -58,6 +58,7 @@ router.post("", async (req, res) => {
         data: d.toString("utf-8").split("\n")
       })
       let sims = await plagChecker(f)
+
       f.relations = sims[0]
       f.total = d.toString("utf-8").split("\n").length
       f.report = {
@@ -85,13 +86,13 @@ router.post("", async (req, res) => {
       })
 
     }
-
   });
   let payload = {
     source_files: files
   }
-
+  console.log("responded")
   res.render("plagShow", payload)
+
 })
 
 
@@ -100,9 +101,15 @@ router.get("/fetch/:id", async (req, res) => {
   let file = await fileModel.findOne({
     _id: req.params.id
   }).populate("relations")
-
-  res.setHeader("Content-type", "application/json")
-  res.send(file)
+  if (file)
+  {
+    res.setHeader("Content-type", "application/json")
+    res.send({ isError: false, message: "success", file: file })
+  } else
+  {
+    res.setHeader("Content-type", "application/json")
+    res.send({ isError: true, message: "processing, please wait", file: null })
+  }
 })
 
 
