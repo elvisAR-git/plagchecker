@@ -5,7 +5,7 @@ const fileModel = require('./models/file.model');
 const plagChecker = require("./plagChecker");
 const fs = require('fs')
 
-mongoose.connect("mongodb+srv://root:root@cluster0.h85gf.mongodb.net/test?retryWrites=true&w=majority")
+mongoose.connect("mongodb+srv://root:pOb65aiHpnDKH3so@cluster0.h85gf.mongodb.net/test?retryWrites=true&w=majority")
 
 let db = mongoose.connection
 
